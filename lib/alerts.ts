@@ -1,10 +1,11 @@
 import crypto from "crypto";
 import { q } from "./db";
+import { recordIncident } from "./incidents";
 import { baseUrl, client, sendSms, twilioEnabled, VoiceResponse } from "./twilio";
 
 export type Alert = {
   id: string; user_id: string; session_id: string | null; token: string; owner_secret: string;
-  status: "active" | "claimed" | "cancelled"; reason: string | null; place_text: string | null;
+  kind: string; status: "active" | "claimed" | "cancelled"; reason: string | null; place_text: string | null;
   claimed_by: string | null; claimed_at: string | null; created_at: string; expires_at: string;
 };
 type Contact = { id: string; name: string; phone: string };
@@ -17,20 +18,22 @@ export async function logEvent(alertId: string | null, sessionId: string | null,
 }
 
 export async function createAlert(input: {
-  userId: string; sessionId?: string | null; reason?: string; placeText?: string; lat?: number; lng?: number;
+  userId: string; sessionId?: string | null; reason?: string; placeText?: string; lat?: number; lng?: number; kind?: "alert" | "soft";
 }) {
   const token = crypto.randomBytes(24).toString("base64url");
   const ownerSecret = crypto.randomBytes(16).toString("base64url");
   const hasGeo = input.lat != null && input.lng != null;
   const [alert] = await q<Alert>(
-    `INSERT INTO alerts(user_id, session_id, token, owner_secret, reason, place_text, geom)
-     VALUES ($1,$2,$3,$4,$5,$6, ${hasGeo ? "ST_SetSRID(ST_MakePoint($8,$7),4326)::geography" : "NULL"})
+    `INSERT INTO alerts(user_id, session_id, token, owner_secret, reason, place_text, kind, geom)
+     VALUES ($1,$2,$3,$4,$5,$6,'${input.kind ?? "alert"}', ${hasGeo ? "ST_SetSRID(ST_MakePoint($8,$7),4326)::geography" : "NULL"})
      RETURNING *`,
     hasGeo
       ? [input.userId, input.sessionId ?? null, token, ownerSecret, input.reason ?? null, input.placeText ?? null, input.lat, input.lng]
       : [input.userId, input.sessionId ?? null, token, ownerSecret, input.reason ?? null, input.placeText ?? null],
   );
   await logEvent(alert.id, alert.session_id, "alert_created", input.reason ?? "alert");
+  if (hasGeo && alert.kind === "alert") recordIncident(input.lat!, input.lng!, "alert").catch(() => {});
+  if (alert.session_id) await q("UPDATE sessions SET persisted=true WHERE id=$1", [alert.session_id]).catch(() => {});
   await dialAll(alert, 1);
   return alert;
 }
@@ -46,8 +49,8 @@ export async function briefing(alert: Alert) {
   return `${name} asked for help${where}. Press 1 to say you are responding. If this is an emergency, call 9 1 1.`;
 }
 
-export function responderLink(alert: Alert) {
-  return `${baseUrl()}/r/${alert.token}`;
+export function responderLink(alert: Alert, contactId?: string) {
+  return `${baseUrl()}/r/${alert.token}${contactId ? `?c=${contactId}` : ""}`;
 }
 
 async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[]) {
@@ -63,8 +66,13 @@ async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[])
          ON CONFLICT (alert_id, contact_id, attempt) DO NOTHING RETURNING *`, [alert.id, c.id, attempt]);
       const row = rows[0];
       if (!row) return;
+      if (alert.kind === "soft") {
+        await sendSms(c.phone, `${name} may be being followed${where}. She did not ask for a call. You can check in and watch her location: ${responderLink(alert, c.id)}`).catch(() => {});
+        await q("UPDATE alert_calls SET status='texted', updated_at=now() WHERE id=$1", [row.id]);
+        return;
+      }
       if (attempt === 1)
-        await sendSms(c.phone, `${name} asked for help${where}. Live link: ${responderLink(alert)} (Haven does not replace 911.)`).catch(() => {});
+        await sendSms(c.phone, `${name} asked for help${where}. Live link: ${responderLink(alert, c.id)} (Haven does not replace 911.)`).catch(() => {});
       if (!twilioEnabled()) {
         await q("UPDATE alert_calls SET status='dry_run', call_sid=$2, updated_at=now() WHERE id=$1", [row.id, "dry_" + row.id]);
         return;
@@ -97,6 +105,17 @@ export async function maybeRetry(alertId: string) {
 }
 
 /** Atomic claim: first to press 1 wins. */
+export async function ackAlert(token: string, contactId: string, kind: string) {
+  const [a] = await q<Alert>("SELECT * FROM alerts WHERE token=$1 AND expires_at>now()", [token]);
+  if (!a) return null;
+  const [c] = await q<Contact>("SELECT id,name,phone FROM contacts WHERE id=$1 AND user_id=$2 AND opted_in_at IS NOT NULL", [contactId, a.user_id]);
+  if (!c) return null;
+  if (kind === "responding" && a.kind === "alert") return claimAlert(a.id, c.id);
+  const ins = await q("INSERT INTO alert_acks(alert_id,contact_id,kind) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING id", [a.id, c.id, kind]);
+  if (ins.length) await logEvent(a.id, a.session_id, "ack", kind.startsWith("eta:") ? `${c.name} can be there in about ${kind.slice(4)} min` : `${c.name} is ${kind === "watching" ? "watching" : "checking in"}`);
+  return { won: false as const, alert: a, claimerName: null };
+}
+
 export async function claimAlert(alertId: string, contactId: string) {
   const [won] = await q<Alert>(
     `UPDATE alerts SET status='claimed', claimed_by=$2, claimed_at=now()

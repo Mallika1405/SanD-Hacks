@@ -12,6 +12,7 @@ const Body = z.object({
   placeText: z.string().max(200).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
+  kind: z.enum(["alert", "soft"]).optional(),
 });
 
 export async function POST(req: Request) {
