@@ -17,5 +17,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
      FROM alert_calls ac JOIN contacts c ON c.id=ac.contact_id WHERE ac.alert_id=$1
      ORDER BY ac.contact_id, ac.attempt DESC`, [a.id]);
   const events = await q("SELECT kind, note, created_at FROM events WHERE alert_id=$1 ORDER BY created_at", [a.id]);
-  return NextResponse.json({ alert: a, calls, events });
+  let loc = null, trail: any[] = [], destination = null, mode = null;
+  if (a.status !== "cancelled" && a.session_id) {
+    trail = await q("SELECT ST_Y(geom::geometry) lat, ST_X(geom::geometry) lng, recorded_at FROM location_points WHERE session_id=$1 ORDER BY recorded_at DESC LIMIT 120", [a.session_id]);
+    trail.reverse();
+    loc = trail[trail.length - 1] ?? null;
+    const [s] = await q<any>("SELECT destination, mode FROM sessions WHERE id=$1", [a.session_id]);
+    destination = s?.destination ?? null; mode = s?.mode ?? null;
+  }
+  return NextResponse.json({ alert: a, calls, events, loc, trail, destination, mode });
 }
