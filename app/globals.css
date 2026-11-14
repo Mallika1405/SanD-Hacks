@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --ground: #12111A; --surface: #1D1B29; --text: #F4F1FA; --muted: #A9A4BC;
+  --accent: #B8A4FF; --amber: #FFC66B; --coral: #FF7A6B; --teal: #5ED1C0;
+}
+@theme inline {
+  --color-ground: var(--ground); --color-surface: var(--surface); --color-ink: var(--text);
+  --color-muted: var(--muted); --color-accent: var(--accent); --color-amber: var(--amber);
+  --color-coral: var(--coral); --color-teal: var(--teal);
+  --font-sans: var(--font-inter);
+}
+html, body { background: var(--ground); color: var(--text); }
+body { font-family: var(--font-inter), system-ui, sans-serif; max-width: 480px; margin: 0 auto; min-height: 100dvh; }
+button { min-height: 44px; }
