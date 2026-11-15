@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { q } from "./db";
 import { recordIncident } from "./incidents";
-import { baseUrl, client, sendSms, twilioEnabled, VoiceResponse } from "./twilio";
+import { baseUrl, client, isEmergencyNumber, sendSms, twilioEnabled, VoiceResponse } from "./twilio";
 
 export type Alert = {
   id: string; user_id: string; session_id: string | null; token: string; owner_secret: string;
@@ -75,6 +75,10 @@ async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[])
         await sendSms(c.phone, `${name} asked for help${where}. Live link: ${responderLink(alert, c.id)} (Haven does not replace 911.)`).catch(() => {});
       if (!twilioEnabled()) {
         await q("UPDATE alert_calls SET status='dry_run', call_sid=$2, updated_at=now() WHERE id=$1", [row.id, "dry_" + row.id]);
+        return;
+      }
+      if (isEmergencyNumber(c.phone)) {
+        await q("UPDATE alert_calls SET status='blocked', updated_at=now() WHERE id=$1", [row.id]);
         return;
       }
       try {

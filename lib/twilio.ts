@@ -1,5 +1,11 @@
 import twilio from "twilio";
 
+/** Haven must never call or text emergency services. Blocks 911/112/999 and similar in any format. */
+export function isEmergencyNumber(raw: string) {
+  const d = (raw || "").replace(/\D/g, "");
+  return /^(1?911|112|999|000|110|119|933)$/.test(d) || /^(1)?(911)$/.test(d);
+}
+
 export const baseUrl = () =>
   (process.env.APP_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 
@@ -31,6 +37,7 @@ export function verifyTwilio(req: Request, params: Record<string, string>): bool
 }
 
 export async function sendSms(to: string, body: string) {
+  if (isEmergencyNumber(to)) throw new Error("Refusing to message an emergency number");
   if (!twilioEnabled()) {
     console.log(`[dry-run sms] ${to}: ${body}`);
     return;

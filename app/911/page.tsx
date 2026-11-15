@@ -12,8 +12,7 @@ export default function Handoff() {
       <ul className="bg-surface rounded-2xl p-4 space-y-2 text-sm">
         <li>Live location (last update {s}s ago)</li><li>Timeline of this session</li><li>Description captured so far</li><li>Contacts already alerted</li>
       </ul>
-      <p className="text-sm text-muted">Haven never places a 911 call for you. If you are in danger, dial 911 yourself.</p>
-      <a href="tel:911" className="block w-full min-h-14 rounded-2xl bg-coral text-ground font-bold text-center leading-[56px]" onClick={(e) => { if (!confirm("This will open your phone dialer for 911. Continue?")) e.preventDefault(); }}>Open phone dialer</a>
+      <p className="text-sm text-muted">Haven never places a 911 call for you. If you are in danger, dial 911 yourself on your phone.</p>
       <button onClick={() => history.back()} className="w-full min-h-12 rounded-2xl bg-surface">Back to Haven</button>
     </main>
   );
