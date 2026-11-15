@@ -153,11 +153,10 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
   const names = [...new Set(tech.items.map((i) => i.source_name))];
 
   return (
-    <div ref={root} className="grid lg:grid-cols-[1.5fr_1fr] gap-5 items-start fade-in">
+    <div ref={root} className="max-w-[560px] mx-auto space-y-4 fade-in">
       <section className="card p-5 lg:p-7" aria-label="Conversation">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-[14.5px] font-medium"><i className={`size-2.5 rounded-full ${conv.status === "connected" ? "bg-sage" : "bg-[#CFC9BB]"}`} aria-hidden />Juno · {status}</p>
-          <span className="tag tag-sage">Live conversation</span>
         </div>
 
         <div className="bc manual mt-5" style={{ ["--s" as any]: phase ? phase.scale : conv.isSpeaking ? 1.04 : 1, ["--d" as any]: phase ? `${phase.ms / 1000}s` : "1.2s" }} aria-hidden>
@@ -190,7 +189,8 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
         {logged && <p role="status" className="mt-3 text-sage text-[14px]">✓ {logged}. <a className="underline" href="/tracker">See my tracker</a></p>}
       </section>
 
-      <aside className="space-y-4">
+      <details className="card-flat p-4"><summary className="cursor-pointer text-[14px] font-medium min-h-10 flex items-center">More: why it works, sounds, sources</summary>
+      <aside className="space-y-4 mt-3">
         {suggest && PAGES[suggest] && (
           <a href={PAGES[suggest].href} className="card p-4 block"><p className="text-[13px] text-ink2">Juno suggests</p><p className="font-medium">{PAGES[suggest].label}</p><p className="text-[13.5px] text-ink2">{PAGES[suggest].sub}</p></a>
         )}
@@ -208,7 +208,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
               {sceneMsg && <p className="text-[13px] text-ink2">{sceneMsg}</p>}</div>}
           </div>
         </article>
-      </aside>
+      </aside></details>
 
       {crisis && <CrisisModal kind={crisis} onClose={() => setCrisis(null)} closeLabel="I'm safe right now. Keep talking with me." />}
     </div>

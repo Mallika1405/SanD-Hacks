@@ -47,18 +47,20 @@ function Now() {
   return (
     <div className="space-y-6 fade-in">
       {!session && (
-        <section className="max-w-[560px]"><h1>What's going on right now?</h1><p className="mt-1.5 text-ink2">Pick the closest one and Juno will start talking with you. You don't have to explain anything. <Link href="/voice" className="underline">Change Juno's voice</Link></p></section>
+        <section className="max-w-[560px]"><h1>What's going on right now?</h1><p className="mt-1.5 text-ink2">Pick the closest one. You don't have to explain anything. <Link href="/voice" className="underline">Change Juno's voice</Link></p></section>
       )}
-      <section className="flex flex-wrap items-center gap-2" aria-label="Where are you, optional">
-        <span className="text-[13.5px] text-ink2 mr-1">Where are you? (optional)</span>
-        {WHERE.map((w) => <button key={w} className="chip" aria-pressed={where === w} onClick={() => setWhere(where === w ? null : w)}>{w[0].toUpperCase() + w.slice(1)}</button>)}
-      </section>
-      <section className={`grid gap-3 ${session ? "sm:grid-cols-4" : "sm:grid-cols-2"}`} aria-label="What are you feeling">
-        {order.map((k) => { const o = OPTS[k]; const active = session?.flow === o.flow; return (
-          <button key={k} disabled={!!busy} onClick={() => start(o.flow)} className={`card text-left p-4 hover:bg-cream transition ${active ? "ring-2 ring-sage/50" : ""}`}>
-            <span className="block font-medium text-[15px]">{busy === o.flow ? "Starting…" : o.title}</span><span className="block text-[13px] text-ink2 mt-0.5">{o.sub}</span>
-          </button>); })}
-      </section>
+      {!session && (
+        <div className="max-w-[560px] space-y-3">
+          <section className="space-y-2.5 step-in" aria-label="What are you feeling">
+            {order.map((k) => { const o = OPTS[k]; return (
+              <button key={k} disabled={!!busy} onClick={() => start(o.flow)} className="w-full text-left rounded-xl border border-line bg-linen px-4 py-3.5 hover:border-sage/50 transition">
+                <span className="block font-medium">{busy === o.flow ? "Starting…" : o.title}</span><span className="block text-[13.5px] text-ink2">{o.sub}</span>
+              </button>); })}
+          </section>
+          <details className="text-[14px]"><summary className="cursor-pointer text-ink2 underline w-fit">Tell Juno where you are (optional)</summary>
+            <div className="flex flex-wrap gap-2 mt-2">{WHERE.map((w) => <button key={w} className="chip" aria-pressed={where === w} onClick={() => setWhere(where === w ? null : w)}>{w[0].toUpperCase() + w.slice(1)}</button>)}</div></details>
+        </div>
+      )}
       {err && <p role="alert" className="text-terra">{err}</p>}
       {session && (scripted ? <Guide key={session.id} sessionId={session.id} onExit={() => setSession(null)} /> : <Companion key={session.id} sessionId={session.id} mode={session.flow} onExit={() => setSession(null)} onFallback={() => setScripted(true)} />)}
       {session && !scripted && <p className="text-[13px] text-ink2">Prefer simple spoken steps without a live conversation? <button className="underline" onClick={() => setScripted(true)}>Use guided steps</button></p>}

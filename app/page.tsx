@@ -76,8 +76,6 @@ export default function Today() {
 
       <section className="flex flex-wrap gap-2.5">
         <Link href="/now?sos=1" className="b b-primary">I need a hand right now</Link>
-        <Link href="/now?mode=talk" className="b b-soft border border-line">Just talk with Juno</Link>
-        <Link href="/diary" className="b b-soft border border-line">Open my diary</Link>
       </section>
 
       <section aria-label="How anxious are you right now">

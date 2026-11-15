@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Newsreader, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { Footer, Header } from "@/components/SiteChrome";
+import { Dock, Footer, Header } from "@/components/SiteChrome";
 import ThemeProvider from "@/components/ThemeProvider";
 
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
@@ -18,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <main className="max-w-[1040px] mx-auto px-4 lg:px-6 pt-6">{children}</main>
         <Footer />
+        <Dock />
       </body>
     </html>
   );

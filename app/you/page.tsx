@@ -9,6 +9,9 @@ const FLOW: Record<string, string> = { panic: "Panic", intrusive: "Looping thoug
 const COND: Record<string, string> = { panic: "panic attacks", ocd: "OCD", gad: "constant worry", social: "social anxiety", overwhelm: "stress and burnout", other: "anxiety" };
 const PAL: [string, string, string][] = [["sage", "Sage", "#2F5D50"], ["slate", "Slate", "#3D5A73"], ["sand", "Sand", "#7B5A3E"], ["mist", "Mist", "#575C94"]];
 
+function Fold({ title, children, open }: { title: string; children: React.ReactNode; open?: boolean }) {
+  return <details open={open} className="card p-0 overflow-hidden group"><summary className="cursor-pointer list-none flex items-center justify-between px-5 py-4 font-medium"><span>{title}</span><span className="text-ink2 transition-transform group-open:rotate-90" aria-hidden>›</span></summary><div className="px-5 pb-5 space-y-4">{children}</div></details>;
+}
 function Seg({ label, value, opts, onPick }: { label: string; value: string; opts: [string, string][]; onPick: (v: string) => void }) {
   return <div><p className="text-[13.5px] text-ink2 mb-1.5">{label}</p><div className="seg" role="group" aria-label={label}>{opts.map(([v, l]) => <button key={v} aria-pressed={value === v} onClick={() => onPick(v)}>{l}</button>)}</div></div>;
 }
@@ -56,8 +59,8 @@ export default function You() {
         <p className="mt-1 text-[13.5px] text-ink2">{auth?.account ? `Signed in as ${auth.account.handle}. ` : "You're using a guest profile that lives on this browser. "}{auth?.account ? <button className="underline" onClick={logout}>Log out</button> : <Link className="underline" href="/login">Make an account</Link>}</p>
       </section>
 
-      <section className="space-y-4">
-        <div><h2>How Somewhere looks for you</h2>
+      <Fold title="How Somewhere looks for you">
+        <div>
           <p className="mt-1 text-[14.5px] text-ink2 prose-narrow">I looked up what design research says helps people with {ui.why.conditions.map((c: string) => COND[c] ?? c).join(" and ")}, and set this up to match. Change anything that doesn't feel right.</p></div>
         <div className="card p-5 space-y-4">
           <Seg label="Light or dark" value={mode} opts={[["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]]} onPick={(v) => { applyMode(v as Mode); setMode(v as Mode); }} />
@@ -76,31 +79,29 @@ export default function You() {
             {ui.why.sources.length > 0 && <div className="mt-3 text-[13.5px]"><p className="text-ink2">Read by Bright Data and summarized by Gemini from:</p><ul className="mt-1 space-y-0.5">{ui.why.sources.map((x: any) => <li key={x.url}><a className="underline text-slate" target="_blank" rel="noreferrer" href={x.url}>{x.name}</a></li>)}</ul></div>}
             <p className="mt-2 text-[12.5px] text-ink2">Design guidance from public pages, not medical advice.</p></details>
         )}
-      </section>
+      </Fold>
 
-      <section>
-        <h2>Check-ins and what helps</h2>
+      <Fold title="Check-ins and what helps">
         <div className="mt-1">
           <div className="row"><span><span className="block text-[15px]">Check in with me the day after a hard session</span><span className="block text-[13px] text-ink2">{on ? (d.checkin ? `Next: ${when(d.checkin.due_at)}` : "On") : "Off. I won't check in unless you turn this on."}</span></span>
             <button role="switch" aria-checked={on} aria-label="Check-ins" onClick={toggleCheckins} className={`shrink-0 w-12 h-7 rounded-full p-0.5 transition ${on ? "bg-sage" : "bg-stone"}`}><span className={`block size-6 rounded-full bg-white shadow transition ${on ? "translate-x-5" : ""}`} /></button></div>
           <div className="row"><span><span className="block text-[15px]">What helps you</span><span className="block text-[13px] text-ink2">{d.prefs?.favorite ? `${d.prefs.favorite}${d.prefs.hard_times ? `, and ${d.prefs.hard_times} are harder` : ""}` : "Nothing remembered yet"}</span></span>{(d.prefs?.favorite || d.prefs?.hard_times) && <button onClick={forget} className="text-[13px] underline text-ink2 min-h-10">Forget</button>}</div>
           <Link href="/voice" className="link-row"><span><span className="block text-[15px]">Juno's voice</span><span className="block text-[13px] text-ink2">{d.prefs?.voice_name ?? "Default"}{d.prefs?.voice_kind === "clone" ? " (a voice you trust)" : ""}</span></span><span className="text-ink2">→</span></Link>
         </div>
-      </section>
+      </Fold>
 
-      <section>
-        <h2>Recent sessions</h2>
+      <Fold title="Recent sessions">
         <div className="mt-1">
           {!d.sessions.length && <p className="py-3 text-ink2 text-[14.5px]">No sessions yet.</p>}
           {d.sessions.slice(0, 5).map((x: any) => <div key={x.id} className="row"><span><span className="block text-[15px]">{FLOW[x.flow] ?? x.flow}</span>{x.helpful.length > 0 && <span className="block text-[13px] text-sage">Helped: {x.helpful.join(", ")}</span>}</span><span className="text-[13px] text-ink2">{when(x.started_at)}</span></div>)}
         </div>
-      </section>
+      </Fold>
 
-      {(d.saved.providers.length > 0 || d.saved.groups.length > 0) && <section><h2>Saved support</h2><div className="mt-1">{[...d.saved.providers, ...d.saved.groups].map((x: any) => <a key={x.id} href={x.source_url} target="_blank" rel="noreferrer" className="link-row"><span className="text-[15px]">{x.name}</span><span className="text-ink2">↗</span></a>)}</div></section>}
+      {(d.saved.providers.length > 0 || d.saved.groups.length > 0) && <Fold title="Saved support"><div className="mt-1">{[...d.saved.providers, ...d.saved.groups].map((x: any) => <a key={x.id} href={x.source_url} target="_blank" rel="noreferrer" className="link-row"><span className="text-[15px]">{x.name}</span><span className="text-ink2">↗</span></a>)}</div></Fold>}
 
-      <section className="border-t border-line pt-5"><h2>Delete my data</h2>
+      <Fold title="Delete my data">
         <p className="mt-1 text-[14px] text-ink2 prose-narrow">Removes your account, diary, tracker, therapy plan, history, preferences and any cloned voice, here and at ElevenLabs.</p>
-        <button onClick={wipe} className="mt-3 b b-terrasoft">Delete everything</button></section>
+        <button onClick={wipe} className="mt-3 b b-terrasoft">Delete everything</button></Fold>
       {msg && <p role="status" className="text-sage text-[14px]">{msg}</p>}
     </div>
   );

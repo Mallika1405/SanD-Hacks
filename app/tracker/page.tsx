@@ -31,6 +31,7 @@ export default function Tracker() {
   const [kind, setKind] = useState<Kind>("daily");
   const [data, setData] = useState<{ logs: any[]; insights: any } | null>(null);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const [logging, setLogging] = useState(false); const [step, setStep] = useState(0);
   // ocd
   const [trigger, setTrigger] = useState<string | null>(null); const [urge, setUrge] = useState<string | null>(null); const [resp, setResp] = useState<"did" | "delayed" | "resisted" | null>(null);
   const [wait, setWait] = useState<number | null>(null); const [before, setBefore] = useState(6); const [after, setAfter] = useState(4); const [note, setNote] = useState("");
@@ -43,7 +44,7 @@ export default function Tracker() {
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((j) => { const c = j.profile?.conditions ?? []; setKind(c.includes("ocd") ? "ocd_urge" : c.includes("panic") ? "panic_episode" : "daily"); }).catch(() => {});
   }, []);
-  useEffect(() => { load(kind); setMsg(""); setErr(""); }, [kind, load]);
+  useEffect(() => { load(kind); setMsg(""); setErr(""); setLogging(false); setStep(0); }, [kind, load]);
 
   async function save() {
     setErr(""); setMsg("");
@@ -58,61 +59,63 @@ export default function Tracker() {
     setBusy(false);
     if (!r.ok) return setErr("I couldn't save that. Please try again.");
     setMsg(kind === "ocd_urge" ? (resp === "did" ? "Logged. That's okay. Noticing it is part of the work, and tomorrow is a fresh try." : resp === "delayed" ? "Logged. Waiting, even a little, is the skill." : "Logged. Resisting is hard. That took effort.") : "Logged.");
-    setTrigger(null); setUrge(null); setResp(null); setWait(null); setNote(""); setHelped([]); load(kind);
+    setTrigger(null); setUrge(null); setResp(null); setWait(null); setNote(""); setHelped([]); setLogging(false); setStep(0); load(kind);
   }
   async function del(id: string) { if (!confirm("Delete this entry?")) return; await fetch(`/api/tracker?id=${id}`, { method: "DELETE" }); load(kind); }
 
+  const steps: string[] = kind === "ocd_urge" ? ["trigger", "urge", "resp", ...(resp === "delayed" ? ["wait"] : []), "before", "after", "note"] : kind === "panic_episode" ? ["intensity", "mins", "ptrig", "helped"] : ["mood", "anx", "sleep", "helped"];
+  const cur = steps[Math.min(step, steps.length - 1)];
+  const need = (cur === "trigger" && !trigger) || (cur === "urge" && !urge) || (cur === "resp" && !resp);
+  const nextStep = () => (step >= steps.length - 1 ? save() : setStep(step + 1));
   const I = data?.insights ?? {};
   const tab = TABS.find((t) => t.id === kind)!;
 
+  const Q = ({ children }: { children: React.ReactNode }) => <h2 className="!text-[1.5rem]">{children}</h2>;
   return (
-    <div className="space-y-8 fade-in">
-      <section className="max-w-[760px]"><span className="tag tag-stone">Tracker · only what you choose to log</span>
-        <h1 className="mt-3 text-[2.6rem] lg:text-[3.2rem] leading-[1.08]">See how it's going, gently.</h1>
-        <p className="mt-3 text-ink2 prose-narrow">A quick log, and a clear picture over time. No streaks, no guilt for missed days. This is self-tracking, not treatment.</p></section>
+    <div className="max-w-[640px] mx-auto space-y-6 fade-in">
+      <section><h1>Tracker</h1><p className="mt-1.5 text-ink2">A quick log and a clear picture over time. No streaks, no guilt. Self-tracking, not treatment.</p></section>
 
-      <div className="seg max-w-xl" role="tablist" aria-label="Tracker type">{TABS.map((t) => <button key={t.id} role="tab" aria-pressed={kind === t.id} onClick={() => setKind(t.id)}>{t.label}</button>)}</div>
+      <div className="seg" role="tablist" aria-label="Tracker type">{TABS.map((t) => <button key={t.id} role="tab" aria-pressed={kind === t.id} onClick={() => setKind(t.id)}>{t.label}</button>)}</div>
 
-      <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6 items-start">
-        {/* ---------- log form ---------- */}
-        <section className="card p-6 lg:p-7 space-y-6" aria-label="Log an entry">
-          <div><h2 className="text-[1.7rem]">{kind === "ocd_urge" ? "Log an urge" : kind === "panic_episode" ? "Log a panic episode" : "How is today?"}</h2><p className="text-[14.5px] text-ink2">{tab.sub}. Takes under a minute.</p></div>
-
-          {kind === "ocd_urge" && (
-            <>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">What set it off?</h3><Chips opts={TRIGGERS} val={trigger} onPick={setTrigger} /></div>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">What did the urge tell you to do?</h3><Chips opts={URGES} val={urge} onPick={setUrge} /></div>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">What did you do?</h3>
-                <div className="grid sm:grid-cols-3 gap-2">{([["did", "I did it", "That's okay. Just log it."], ["delayed", "I delayed it", "Waited before giving in"], ["resisted", "I resisted fully", "Didn't do it at all"]] as const).map(([k, t, s]) => (
-                  <button key={k} type="button" aria-pressed={resp === k} onClick={() => setResp(k)} className={`text-left rounded-xl p-3.5 border ${resp === k ? "bg-mint/50 border-sage" : "bg-cream border-line"}`}><span className="block font-semibold">{t}</span><span className="block text-[13px] text-ink2">{s}</span></button>))}</div></div>
-              {resp === "delayed" && <div className="space-y-2"><h3 className="text-[1.1rem]">How long did you wait?</h3><Chips opts={WAITS.map((w) => `${w} min`)} val={wait ? `${wait} min` : null} onPick={(v) => setWait(v ? parseInt(v) : null)} /></div>}
-              <div className="grid sm:grid-cols-2 gap-5"><Slider label="Distress before" v={before} set={setBefore} /><Slider label="Distress after" v={after} set={setAfter} /></div>
-              <label className="block"><span className="text-[14px] text-ink2">Anything you want to remember (optional)</span><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={240} className="mt-1" /></label>
-            </>
-          )}
-          {kind === "panic_episode" && (
-            <>
-              <Slider label="How intense did it get?" v={intensity} set={setIntensity} />
-              <div className="space-y-2"><h3 className="text-[1.1rem]">About how long did it last?</h3><Chips opts={MIN_OPTS.map((m) => `${m} min`)} val={mins ? `${mins} min` : null} onPick={(v) => setMins(v ? parseInt(v) : null)} /></div>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">Any trigger?</h3><Chips opts={P_TRIG} val={pTrig} onPick={setPTrig} /></div>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">What helped?</h3><Multi opts={HELPED} val={helped} onPick={setHelped} /></div>
-            </>
-          )}
-          {kind === "daily" && (
-            <>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">Mood</h3><div className="seg">{MOOD.map((m, i) => <button key={m} type="button" aria-pressed={mood === i} onClick={() => setMood(i)}>{m}</button>)}</div></div>
-              <Slider label="Anxiety today" v={anx} set={setAnx} />
-              <div className="space-y-2"><h3 className="text-[1.1rem]">Sleep last night</h3><Chips opts={SLEEP} val={sleep} onPick={setSleep} /></div>
-              <div className="space-y-2"><h3 className="text-[1.1rem]">What helped?</h3><Multi opts={HELPED} val={helped} onPick={setHelped} /></div>
-            </>
-          )}
-          {err && <p role="alert" className="text-terra text-[14.5px]">{err}</p>}
-          <button onClick={save} disabled={busy} className="b b-primary">{busy ? "Saving…" : "Save entry"}</button>
-          {msg && <p role="status" className="card-flat p-4 text-sage font-medium">{msg}</p>}
+      {!logging ? (
+        <section className="card p-5 flex items-center justify-between gap-3" aria-label="Log an entry">
+          <div><p className="font-medium">{kind === "ocd_urge" ? "Log an urge" : kind === "panic_episode" ? "Log a panic episode" : "How is today?"}</p><p className="text-[13.5px] text-ink2">{tab.sub}. Takes under a minute.</p></div>
+          <button onClick={() => { setLogging(true); setStep(0); setMsg(""); setErr(""); }} className="b b-primary shrink-0">Start</button>
         </section>
+      ) : (
+        <section className="space-y-5" aria-label="Log an entry">
+          <div className="flex items-center gap-3"><div className="flex-1 h-1.5 rounded-full bg-stone overflow-hidden"><div className="h-full bg-sage transition-all duration-500" style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><span className="text-[13px] text-ink2">{step + 1} of {steps.length}</span></div>
+          <div key={cur} className="step-in space-y-4 min-h-[240px]">
+            {cur === "trigger" && <><Q>What set it off?</Q><Chips opts={TRIGGERS} val={trigger} onPick={setTrigger} /></>}
+            {cur === "urge" && <><Q>What did the urge tell you to do?</Q><Chips opts={URGES} val={urge} onPick={setUrge} /></>}
+            {cur === "resp" && <><Q>What did you do?</Q>
+              <div className="space-y-2">{([["did", "I did it", "That's okay. Just log it."], ["delayed", "I delayed it", "Waited before giving in"], ["resisted", "I resisted fully", "Didn't do it at all"]] as const).map(([k, t, s2]) => (
+                <button key={k} type="button" aria-pressed={resp === k} onClick={() => setResp(k)} className={`w-full text-left rounded-xl px-4 py-3 border ${resp === k ? "bg-mint/50 border-sage" : "bg-linen border-line"}`}><span className="block font-medium">{t}</span><span className="block text-[13px] text-ink2">{s2}</span></button>))}</div></>}
+            {cur === "wait" && <><Q>How long did you wait?</Q><Chips opts={WAITS.map((w) => `${w} min`)} val={wait ? `${wait} min` : null} onPick={(v) => setWait(v ? parseInt(v) : null)} /></>}
+            {cur === "before" && <><Q>How distressing was it before?</Q><Slider label="Before" v={before} set={setBefore} /></>}
+            {cur === "after" && <><Q>And after?</Q><Slider label="After" v={after} set={setAfter} /></>}
+            {cur === "note" && <><Q>Anything you want to remember?</Q><p className="text-ink2 text-[14px] -mt-2">Optional.</p><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={240} aria-label="Note" /></>}
+            {cur === "intensity" && <><Q>How intense did it get?</Q><Slider label="Intensity" v={intensity} set={setIntensity} /></>}
+            {cur === "mins" && <><Q>About how long did it last?</Q><Chips opts={MIN_OPTS.map((m) => `${m} min`)} val={mins ? `${mins} min` : null} onPick={(v) => setMins(v ? parseInt(v) : null)} /></>}
+            {cur === "ptrig" && <><Q>Any trigger?</Q><Chips opts={P_TRIG} val={pTrig} onPick={setPTrig} /></>}
+            {cur === "helped" && <><Q>What helped?</Q><Multi opts={HELPED} val={helped} onPick={setHelped} /></>}
+            {cur === "mood" && <><Q>How's your mood?</Q><div className="seg">{MOOD.map((m, i) => <button key={m} type="button" aria-pressed={mood === i} onClick={() => setMood(i)}>{m}</button>)}</div></>}
+            {cur === "anx" && <><Q>How anxious are you today?</Q><Slider label="Anxiety" v={anx} set={setAnx} /></>}
+            {cur === "sleep" && <><Q>How did you sleep?</Q><Chips opts={SLEEP} val={sleep} onPick={setSleep} /></>}
+            {err && <p role="alert" className="text-terra text-[14.5px]">{err}</p>}
+          </div>
+          <div className="flex items-center justify-between">
+            <button onClick={() => (step === 0 ? setLogging(false) : setStep(step - 1))} className="b b-ghost">{step === 0 ? "Cancel" : "Back"}</button>
+            <button onClick={nextStep} disabled={busy || need} className="b b-primary px-7">{step >= steps.length - 1 ? (busy ? "Saving…" : "Save") : "Next"}</button>
+          </div>
+        </section>
+      )}
+      {msg && <p role="status" className="card-flat p-4 text-sage font-medium">{msg}</p>}
 
+      {!logging && (
+      <div className="space-y-6">
         {/* ---------- insights ---------- */}
-        <aside className="space-y-6">
+        <div className="space-y-6">
           <article className="card p-6 space-y-4">
             <h2 className="text-[1.6rem]">Over time</h2>
             {!data && <p className="text-ink2">Loading…</p>}
@@ -149,7 +152,7 @@ export default function Tracker() {
           </article>
 
           {data && data.logs.length > 0 && (
-            <article className="card p-6 space-y-2"><h2 className="text-[1.4rem]">Recent entries</h2>
+            <details className="card p-5"><summary className="cursor-pointer font-medium">Recent entries</summary><div className="mt-3 space-y-2">
               {data.logs.slice(0, 8).map((l) => (
                 <div key={l.id} className="card-flat p-3 flex items-start justify-between gap-3"><div className="text-[14px]"><p className="text-[12px] text-ink2">{when(l.created_at)}</p>
                   {kind === "ocd_urge" && <p><b>{l.data.response === "did" ? "Did it" : l.data.response === "delayed" ? `Delayed${l.data.delay_min ? ` ${l.data.delay_min} min` : ""}` : "Resisted"}</b> · {l.data.urge} · {l.data.trigger}</p>}
@@ -157,10 +160,11 @@ export default function Tracker() {
                   {kind === "daily" && <p><b>Mood {l.data.mood}/5</b> · anxiety {l.data.anxiety}/10{l.data.sleep ? ` · slept ${l.data.sleep}` : ""}</p>}</div>
                   <button onClick={() => del(l.id)} className="text-[12.5px] text-terra underline min-h-10">Delete</button></div>
               ))}
-            </article>
+            </div></details>
           )}
-        </aside>
+        </div>
       </div>
+      )}
     </div>
   );
 }

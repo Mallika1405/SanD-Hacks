@@ -142,7 +142,7 @@ export default function Diary() {
   const spark = trend.length > 1 ? trend.map((v, i) => `${(i / (trend.length - 1)) * 220},${46 - (v / 10) * 42}`).join(" ") : "";
 
   return (
-    <div className="space-y-8 fade-in">
+    <div className="max-w-[640px] mx-auto space-y-6 fade-in">
       <section className="max-w-[640px]">
         <h1 className="text-[2rem] leading-[1.15]">Talk it through</h1>
         <p className="mt-2 text-ink2">Say it out loud or write it. I'll talk back, ask a gentle question now and then, and keep your own words so you can look back on them. <a href="/voice" className="underline">Change the voice</a></p>
@@ -159,7 +159,7 @@ export default function Diary() {
           {data.signals.length > 0 && data.progress === "improving" && <p className="text-[13.5px] text-ink2">Your most recent entries have felt a little lighter, which is a good sign.</p>}
         </section>
       )}
-      <div className="grid lg:grid-cols-[1.45fr_1fr] gap-6 items-start">
+      <div className="space-y-4">
         <section className="card p-5 lg:p-6 space-y-4" aria-label="Conversation">
           {phase === "idle" && (
             <div className="space-y-3">
@@ -202,7 +202,8 @@ export default function Diary() {
           {phase === "review" && <p className="text-ink2 text-[14.5px]">Here's what I heard. Look it over below, then keep it or let it go.</p>}
         </section>
 
-        <aside className="space-y-6">
+        <details className="card-flat p-4"><summary className="cursor-pointer text-[14px] font-medium min-h-10 flex items-center">Patterns over time</summary>
+        <aside className="space-y-6 mt-3">
           <article className="card p-6">
             <h2 className="text-[1.5rem]">Over time</h2>
             {!data?.entries.length ? <p className="mt-2 text-[14.5px] text-ink2">Once you've saved a few entries, I'll show the themes and feelings that keep coming up.</p> : (
@@ -217,7 +218,7 @@ export default function Diary() {
             )}
           </article>
           <article className="card-flat p-5 text-[14px] text-ink2"><p className="font-semibold text-ink">Prefer to be guided?</p><p className="mt-1">If it's loud in your head right now, start with <a className="underline text-slate" href="/now?sos=1">a guided grounding</a> first. The diary will be here after.</p></article>
-        </aside>
+        </aside></details>
       </div>
 
       {/* ---------- review ---------- */}
@@ -247,7 +248,7 @@ export default function Diary() {
         <h2 className="text-[1.5rem]">Your entries</h2>
         {!data && <p className="text-ink2">Loading…</p>}
         {data && !data.entries.length && <p className="card-flat p-5 text-ink2">Nothing saved yet. When you're ready, tap Talk to me or Write instead.</p>}
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-3">
           {data?.entries.map((e) => (
             <article key={e.id} className="card p-5 space-y-2">
               <div className="flex items-start justify-between gap-3"><div><p className="text-[12.5px] text-ink2">{when(e.created_at)}</p><h3 className="text-[1.2rem] leading-tight">{e.title}</h3></div><div className="flex items-center gap-1.5">{e.risk && e.risk !== "none" && <span className="tag tag-terra">Worth a second look</span>}{e.intensity != null && <span className="tag tag-stone">{e.intensity}/10</span>}</div></div>
