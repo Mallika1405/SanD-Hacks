@@ -10,7 +10,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit",
-    "prewarm": "tsx scripts/prewarm.ts"
+    "prewarm": "tsx scripts/prewarm.ts",
+    "postinstall": "cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/"
   },
   "dependencies": {
     "@elevenlabs/react": "^1.22.1",

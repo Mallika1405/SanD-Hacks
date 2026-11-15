@@ -7,6 +7,9 @@ export type MapMarker = { lat: number; lng: number; color: string; label: string
 export type MapLine = { coords: [number, number][]; color: string; dashed?: boolean };
 export type MapHeat = { lat: number; lng: number; w?: number };
 
+// Turbopack cannot bundle the worker; serve it from /public (copied on install).
+if (typeof window !== "undefined") maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
+
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: { base: { type: "raster", tileSize: 256, attribution: "© OpenStreetMap contributors",
