@@ -32,7 +32,7 @@ const str = (v: any, n = 300) => (v == null || v === "" ? null : String(v).slice
 export async function ingestPage(pageUrl: string): Promise<{ providers: number; groups: number }> {
   const text = await unlock(pageUrl);
   if (text.length < 200) return { providers: 0, groups: 0 };
-  const ex = await gemini<Extracted>(`PAGE URL: ${pageUrl}\n\nPAGE TEXT:\n${text}`, true, { system: EXTRACT_SYSTEM, timeoutMs: 40000 });
+  const ex = await gemini<Extracted>(`PAGE URL: ${pageUrl}\n\nPAGE TEXT:\n${text}`, true, { system: EXTRACT_SYSTEM, timeoutMs: 25000 });
   if (!ex) return { providers: 0, groups: 0 };
   let p = 0, g = 0;
   for (const x of (ex.providers ?? []).slice(0, 12)) {
@@ -278,19 +278,27 @@ export function liveQueries(a: Answers, specs: Spec[]): string[] {
  * Real-time discovery: search the web, fetch and parse pages as she waits, and emit updated ranked results after every page.
  * Uses Bright Data (public pages only) and Gemini extraction; everything is stored in Neon with source and checked time.
  */
-export async function liveDiscover(answers: Answers, specs: Spec[], emit: (e: any) => void, budgetMs = 50000) {
+export async function liveDiscover(answers: Answers, specs: Spec[], emit: (e: any) => void, budgetMs = 32000) {
   const t0 = Date.now();
-  const queries = liveQueries(answers, specs);
-  emit({ type: "status", text: `Searching the web for ${queries.length} kinds of support near ${answers.city}…` });
-  // A few at a time: firing every search at once makes the search API reply "busy".
+  // Google Maps first: fast, and it gives people something to look at straight away.
+  if (placesEnabled() && answers.lat != null) {
+    emit({ type: "status", text: "Checking Google Maps for practices near you…" });
+    await placesDiscover(answers, specs);
+    emit({ type: "results", ...(await rank(answers, specs)) });
+  }
+  const queries = liveQueries(answers, specs).slice(0, 5);
+  emit({ type: "status", text: `Searching the web for therapists and groups near ${answers.city}…` });
+  // One at a time: the search API replies empty or "busy" when several arrive together.
   const hitLists: Awaited<ReturnType<typeof serpLinks>>[] = [];
-  for (let i = 0; i < queries.length; i += 3) hitLists.push(...(await Promise.all(queries.slice(i, i + 3).map((qq) => serpLinks(qq, 3).catch(() => [])))));
+  for (const qq of queries) {
+    if (Date.now() - t0 > 15000 || hitLists.flat().length >= 12) break;
+    hitLists.push(await serpLinks(qq, 3).catch(() => []));
+  }
   const urls: string[] = [];
   for (const h of hitLists.flat()) { try { if (!SKIP_HOSTS.test(new URL(h.url).hostname) && !urls.includes(h.url)) urls.push(h.url); } catch {} }
   const recent = new Set((await q<{ source_url: string }>(`SELECT source_url FROM providers WHERE checked_at > now() - interval '12 hours' UNION SELECT source_url FROM groups WHERE checked_at > now() - interval '12 hours'`)).map((r) => r.source_url));
   const todo = urls.filter((u) => !recent.has(u)).slice(0, 12);
   emit({ type: "status", text: `Found ${urls.length} pages${urls.length - todo.length ? ` (${urls.length - todo.length} checked recently)` : ""}. Reading ${todo.length} now…` });
-  if (placesEnabled() && answers.lat != null) { emit({ type: "status", text: "Checking Google Maps for practices near you…" }); await placesDiscover(answers, specs); }
   emit({ type: "results", ...(await rank(answers, specs)) });
 
   let done = 0, queue = [...todo];
@@ -305,7 +313,7 @@ export async function liveDiscover(answers: Answers, specs: Spec[], emit: (e: an
       emit({ type: "status", text: `Read ${done} of ${todo.length} pages…` });
     }
   };
-  await Promise.all([worker(), worker(), worker(), worker()]);
+  await Promise.all([worker(), worker(), worker()]);
   if (answers.lat != null) { emit({ type: "status", text: "Working out how far each one is…" }); await geocodePending(16); emit({ type: "results", ...(await rank(answers, specs)) }); }
   emit({ type: "status", text: queue.length ? `Stopped early to keep this quick. Read ${done} of ${todo.length} pages.` : `Done. Read ${done} pages.` });
 }

@@ -18,7 +18,7 @@ const strip = (html: string) =>
 
 /** Fetch a public page through Web Unlocker as plain text. */
 export async function unlock(url: string, max = 14000) {
-  const html = await bd({ zone: process.env.BRIGHTDATA_UNLOCKER_ZONE || "web_unlocker1", url }, 45000);
+  const html = await bd({ zone: process.env.BRIGHTDATA_UNLOCKER_ZONE || "web_unlocker1", url }, 25000);
   return strip(html).slice(0, max);
 }
 
@@ -45,7 +45,7 @@ export async function serpLinks(query: string, limit = 5): Promise<SerpHit[]> {
     if (attempt) await new Promise((r) => setTimeout(r, 700 * attempt));
     const q = variants[attempt];
     try {
-      const txt = await bd({ zone, url: `https://www.google.com/search?q=${encodeURIComponent(q)}&hl=en&gl=us&brd_json=1` }, 40000);
+      const txt = await bd({ zone, url: `https://www.google.com/search?q=${encodeURIComponent(q)}&hl=en&gl=us&brd_json=1` }, 20000);
       let j: any;
       try { j = JSON.parse(txt); } catch { console.error("serp non-JSON reply:", txt.slice(0, 120)); continue; }
       const hits: SerpHit[] = [];
