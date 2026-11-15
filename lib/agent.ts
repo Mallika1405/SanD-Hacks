@@ -226,7 +226,7 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
       const g = await gemini<{ say: string }>(
         `Write ONE short, warm check-in sentence (max 20 words) for someone who asked to be checked on. No pressure, no advice. ${helped ? `Something that helped them before (they agreed to be remembered): ${helped}.` : ""} ${pr?.prefers?.hard_times ? `They said ${pr.prefers.hard_times} can be harder.` : ""} Reply JSON {"say":"..."}`,
         true, { timeoutMs: 4000 });
-      const line = g?.say && !BANNED.test(g.say) && g.say.split(/\s+/).length <= 30 ? g.say.trim() : "Hi. It's Somewhere, checking in like you asked.";
+      const line = g?.say && !BANNED.test(g.say) && g.say.split(/\s+/).length <= 30 ? g.say.trim() : "Hi. It's Anchor, checking in like you asked.";
       ctx.pending = "checkin_reply"; state = "start";
       say = [S(line, 600), S("How are you doing right now?", 400, true)];
     } else if (input.event === "choose") {

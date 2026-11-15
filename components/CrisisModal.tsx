@@ -20,7 +20,7 @@ export default function CrisisModal({ kind, onClose, closeLabel = "I'm safe righ
           <button onClick={share} className="b b-ghost w-full">Message someone I trust</button>
           <a href="/crisis" className="b w-full text-ink2 underline">More support options</a>
           <button onClick={onClose} className="b w-full text-ink2 underline">{closeLabel}</button>
-          <p className="text-[12px] text-ink2">Somewhere is a demo and not a medical service or crisis line. It can't call anyone for you; these buttons open your phone.</p>
+          <p className="text-[12px] text-ink2">Anchor is a demo and not a medical service or crisis line. It can't call anyone for you; these buttons open your phone.</p>
         </div>
       </div>
     </>

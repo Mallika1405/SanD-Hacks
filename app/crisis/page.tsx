@@ -85,8 +85,8 @@ export default function Crisis() {
         </aside>
       </div>
 
-      <section className="card-flat p-6"><h3 className="text-[1.2rem]">About Somewhere</h3>
-        <p className="mt-2 text-[14.5px] text-ink2 prose-narrow">Somewhere is a demo and is not a medical service, therapist, or crisis line. It can't call anyone for you and can't tell what's wrong. The links on this page open your phone's own call or text app and connect you to independent services.</p></section>
+      <section className="card-flat p-6"><h3 className="text-[1.2rem]">About Anchor</h3>
+        <p className="mt-2 text-[14.5px] text-ink2 prose-narrow">Anchor is a demo and is not a medical service, therapist, or crisis line. It can't call anyone for you and can't tell what's wrong. The links on this page open your phone's own call or text app and connect you to independent services.</p></section>
     </div>
   );
 }

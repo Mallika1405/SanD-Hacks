@@ -42,7 +42,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-canvas/85 backdrop-blur">
       <div className="max-w-[1040px] mx-auto px-4 lg:px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="serif" aria-label="Somewhere, home">somewhere</Link>
+        <Link href="/" className="serif" aria-label="Anchor, home">anchor</Link>
         <div className="flex items-center gap-2">
           <Link href="/now?sos=1" className="h-9 px-3.5 inline-flex items-center rounded-full bg-terrasoft text-terradeep text-[14px] font-semibold">I need help now</Link>
           <div className="relative" ref={box}>
@@ -88,7 +88,7 @@ export function Footer() {
   return (
     <footer className="mt-10 mb-24">
       <div className="max-w-[1040px] mx-auto px-4 lg:px-6 text-[12.5px] text-ink2 flex flex-wrap items-center justify-between gap-2">
-        <p className="max-w-[60ch]">Somewhere is a demo, not a medical service. In danger? Call 911. Emotional crisis? Call or text <a className="underline" href="tel:988">988</a>.</p>
+        <p className="max-w-[60ch]">Anchor is a demo, not a medical service. In danger? Call 911. Emotional crisis? Call or text <a className="underline" href="tel:988">988</a>.</p>
         <Link href="/crisis" className="underline">Crisis support</Link>
       </div>
     </footer>

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
   const fd = new FormData();
   fd.append("name", `somewhere-${device.slice(0, 8)}-${name}`);
-  fd.append("description", "Instant clone created with the speaker's consent for Somewhere.");
+  fd.append("description", "Instant clone created with the speaker's consent for Anchor.");
   fd.append("remove_background_noise", "true");
   fd.append("files", file, (file as File).name || "voice.webm");
   const r = await fetch("https://api.elevenlabs.io/v1/voices/add", { method: "POST", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY }, body: fd, signal: AbortSignal.timeout(50000) }).catch(() => null);

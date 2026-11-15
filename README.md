@@ -1,8 +1,8 @@
-# somewhere.
+# anchor.
 
 A calm, guided companion for panic, racing thoughts and overwhelm, a voice diary for when you need to talk it out, and a way to find real care. UI built on the "Sanctuary Minimalist" design system (Stitch export).
 
-**Somewhere is a demo and not a medical service or crisis line.** It never diagnoses, never promises to stop an attack, and never replaces qualified care. It cannot place calls or send texts; the 988 and 911 buttons open your phone.
+**Anchor is a demo and not a medical service or crisis line.** It never diagnoses, never promises to stop an attack, and never replaces qualified care. It cannot place calls or send texts; the 988 and 911 buttons open your phone.
 
 ## Run
 ```bash

@@ -30,7 +30,7 @@ export async function POST() {
     system: `You help a person prepare for their next therapy session using only their own logs. Write in second person, warm, plain, hedged ("it looks like"). No diagnosis, no advice beyond what to bring up. Reply JSON {"bring": [3 to 5 short things worth raising], "wins": [up to 3 real things that went better, only if the data shows it], "struggles": [up to 3 honest hard spots], "questions": [up to 3 questions they could ask their therapist]}.`, timeoutMs: 15000 });
   const prep: Prep = g ? { bring: arr(g.bring, 5), wins: arr(g.wins, 3), struggles: arr(g.struggles, 3), questions: arr(g.questions, 3) } : { bring: facts.slice(0, 4), wins: [], struggles: [], questions: [] };
   const share = [
-    `Summary from my own logs (self-reported, made with Somewhere), last 14 days${plan?.therapist_name ? ` — for ${plan.therapist_name}` : ""}:`,
+    `Summary from my own logs (self-reported, made with Anchor), last 14 days${plan?.therapist_name ? ` — for ${plan.therapist_name}` : ""}:`,
     ...facts.map((f) => `- ${f}`),
     ...(prep.wins.length ? ["What went better:", ...prep.wins.map((x) => `- ${x}`)] : []),
     ...(prep.struggles.length ? ["What's been hard:", ...prep.struggles.map((x) => `- ${x}`)] : []),

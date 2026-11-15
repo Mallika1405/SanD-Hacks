@@ -1,6 +1,6 @@
-# How Somewhere adapts to each person, and the research behind it
+# How Anchor adapts to each person, and the research behind it
 
-Somewhere adjusts its tone, questions, suggestions and layout to a person's conditions (`lib/personas.ts`, `lib/ui.ts`). Everything is a starting point the person can change. None of it is a diagnosis or medical advice.
+Anchor adjusts its tone, questions, suggestions and layout to a person's conditions (`lib/personas.ts`, `lib/ui.ts`). Everything is a starting point the person can change. None of it is a diagnosis or medical advice.
 
 Sources below were found by searching PubMed (and Bright Data for layout research). We report what each one says and where the evidence is thin.
 
@@ -18,5 +18,5 @@ Sources below were found by searching PubMed (and Bright Data for layout researc
 
 ## Honest limits
 - Search results were limited. We did not run a systematic review.
-- Nothing here has been tested in a trial of Somewhere itself.
+- Nothing here has been tested in a trial of Anchor itself.
 - Layout settings per condition come from public design guidance found with Bright Data and summarised by Gemini (`npm run ui:research`), not clinical trials.

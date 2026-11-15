@@ -47,7 +47,7 @@ export default function You() {
   async function forget() { await fetch("/api/me", { method: "PATCH" }); setMsg("I've forgotten what helps."); load(); }
   async function logout() { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }
   async function wipe() {
-    if (!confirm("Delete everything Somewhere has saved about you? That includes your account, diary, tracker, therapy plan, history, preferences and any cloned voice. This can't be undone.")) return;
+    if (!confirm("Delete everything Anchor has saved about you? That includes your account, diary, tracker, therapy plan, history, preferences and any cloned voice. This can't be undone.")) return;
     const j = await fetch("/api/me", { method: "DELETE" }).then((r) => r.json()).catch(() => ({}));
     if (!j.ok) return setMsg("I couldn't delete your cloned voice, so nothing was removed. Please try again.");
     await fetch("/api/auth/logout", { method: "POST" }); router.push("/login");
@@ -63,7 +63,7 @@ export default function You() {
         <p className="mt-1 text-[13.5px] text-ink2">{auth?.account ? `Signed in as ${auth.account.handle}. ` : "You're using a guest profile that lives on this browser. "}{auth?.account ? <button className="underline" onClick={logout}>Log out</button> : <Link className="underline" href="/login">Make an account</Link>}</p>
       </section>
 
-      <Fold title="How Somewhere looks for you">
+      <Fold title="How Anchor looks for you">
         <div>
           <p className="mt-1 text-[14.5px] text-ink2 prose-narrow">I looked up what design research says helps people with {ui.why.conditions.map((c: string) => COND[c] ?? c).join(" and ")}, and set this up to match. Change anything that doesn't feel right.</p></div>
         <div className="card p-5 space-y-4">

@@ -395,7 +395,7 @@ export default function Guide({ sessionId, first, onExit }: { sessionId: string;
               <a href={crisis === "medical" ? "tel:988" : "tel:911"} className="b b-soft w-full border border-line">{crisis === "medical" ? "Call 988 (emotional crisis)" : "Call 911 (medical emergency)"}</a>
               <button onClick={share} className="b b-ghost w-full">Message someone I trust</button>
               <button onClick={safeNow} className="b w-full text-ink2 underline">I'm safe right now. Keep guiding me.</button>
-              <p className="text-[12px] text-ink2">Somewhere is a demo and not a medical service or crisis line. It can't call anyone for you; these buttons open your phone.</p>
+              <p className="text-[12px] text-ink2">Anchor is a demo and not a medical service or crisis line. It can't call anyone for you; these buttons open your phone.</p>
             </div>
           </div>
         </>

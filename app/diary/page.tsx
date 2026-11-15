@@ -130,7 +130,7 @@ export default function Diary() {
 
   async function save() {
     if (!draft) return;
-    const full = msgsRef.current.map((m) => `${m.role === "user" ? "Me" : "Somewhere"}: ${m.text}`).join("\n").slice(0, 20000);
+    const full = msgsRef.current.map((m) => `${m.role === "user" ? "Me" : "Anchor"}: ${m.text}`).join("\n").slice(0, 20000);
     const r = await fetch("/api/diary/save", { method: "POST", body: JSON.stringify({ ...draft, transcript: keep ? full : null, duration_s: Math.round((Date.now() - started) / 1000) }) });
     if (!r.ok) return setErr("I couldn't save that. Please try again.");
     setDraft(null); setPhase("idle"); setMsgs([]); msgsRef.current = []; flash("Saved to your diary, in your own words."); load();
@@ -197,7 +197,7 @@ export default function Diary() {
                 <button onClick={finish} disabled={phase === "working"} className="b b-primary">{phase === "working" ? "Putting it together…" : "I'm done, save this"}</button>
               </div>
               <button role="switch" aria-checked={keep} onClick={() => setKeep(!keep)} className="check-row !min-h-[40px] text-[13.5px]"><span className="box">{keep && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span>Keep our full conversation, word for word, with this entry</span></button>
-              <p className="text-[12.5px] text-ink2">Nothing is saved until you tap save. If you say something that sounds like you might be in danger, I'll show you where to get help right away. Somewhere isn't a crisis line.</p>
+              <p className="text-[12.5px] text-ink2">Nothing is saved until you tap save. If you say something that sounds like you might be in danger, I'll show you where to get help right away. Anchor isn't a crisis line.</p>
             </>
           )}
           {phase === "review" && <p className="text-ink2 text-[14.5px]">Here's what I heard. Look it over below, then keep it or let it go.</p>}
@@ -274,7 +274,7 @@ export default function Diary() {
               {crisis !== "medical" && <a href="sms:988" className="b b-soft w-full border border-line">Text 988</a>}
               <a href="/crisis" className="b b-ghost w-full">More support options</a>
               <button onClick={() => setCrisis(null)} className="b w-full text-ink2 underline">I'm safe right now</button>
-              <p className="text-[12px] text-ink2">Somewhere is a demo and not a medical service or crisis line. It can't call anyone for you.</p>
+              <p className="text-[12px] text-ink2">Anchor is a demo and not a medical service or crisis line. It can't call anyone for you.</p>
             </div>
           </div>
         </>

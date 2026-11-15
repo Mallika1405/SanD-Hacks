@@ -115,7 +115,7 @@ export default function Voice() {
       {d?.clone?.available && (
         <section className="card p-5 space-y-3" aria-label="Add a voice you trust">
           <h2>Add a voice you trust</h2>
-          <p className="text-[14px] text-ink2">Hear the guidance in a voice that feels safe, like yours or someone close to you. You can add up to 5. They only ever say Somewhere's own words, never anything typed in.</p>
+          <p className="text-[14px] text-ink2">Hear the guidance in a voice that feels safe, like yours or someone close to you. You can add up to 5. They only ever say Anchor's own words, never anything typed in.</p>
           <div className="space-y-3">
             <label className="block"><span className="text-[13.5px] text-ink2">Whose voice is this?</span><input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Me, Mom, a friend…" className="mt-1" /></label>
             <p className="text-[14px] card-flat p-3 leading-snug">{PROMPT}</p>
@@ -132,7 +132,7 @@ export default function Voice() {
       )}
       {saved && <p role="status" className="text-sage text-[14px]">{saved}</p>}
       {err && <p role="alert" className="text-terra text-[14px]">{err}</p>}
-      <p className="text-[12.5px] text-ink2">Somewhere is a demo and not a medical service or crisis line.</p>
+      <p className="text-[12.5px] text-ink2">Anchor is a demo and not a medical service or crisis line.</p>
     </main>
   );
 }

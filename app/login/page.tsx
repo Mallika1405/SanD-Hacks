@@ -33,12 +33,12 @@ export default function Login() {
   return (
     <div className="min-h-dvh grid lg:grid-cols-[1fr_1fr]">
       <section className="px-6 py-10 lg:px-14 lg:py-16 flex flex-col justify-between gap-10" style={{ background: "linear-gradient(160deg, var(--mint) 0%, var(--canvas) 70%)" }}>
-        <p className="serif text-[1.5rem]">somewhere</p>
+        <p className="serif text-[1.5rem]">anchor</p>
         <div className="max-w-[26rem] space-y-4">
           <h1 className="!text-[2.1rem] lg:!text-[2.6rem] leading-[1.1]">A calm place to land when your head is loud.</h1>
-          <p className="text-ink2 text-[1.02rem]">Somewhere has someone to talk to at 3am, a place to keep track of how you're really doing, and a way to keep up with the help you're getting.</p>
+          <p className="text-ink2 text-[1.02rem]">Anchor has someone to talk to at 3am, a place to keep track of how you're really doing, and a way to keep up with the help you're getting.</p>
         </div>
-        <p className="text-[13px] text-ink2 max-w-[34ch]">Somewhere is a demo, not a medical service. In an emergency call 911, or call or text <a className="underline" href="tel:988">988</a>. <a className="underline" href="/crisis">More support</a></p>
+        <p className="text-[13px] text-ink2 max-w-[34ch]">Anchor is a demo, not a medical service. In an emergency call 911, or call or text <a className="underline" href="tel:988">988</a>. <a className="underline" href="/crisis">More support</a></p>
       </section>
 
       <section className="px-6 py-10 lg:px-14 lg:py-16 flex flex-col justify-center gap-6">

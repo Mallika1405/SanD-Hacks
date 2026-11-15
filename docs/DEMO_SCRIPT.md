@@ -1,4 +1,4 @@
-# Somewhere: 3-minute demo video script
+# Anchor: 3-minute demo video script
 
 About 400 spoken words. Record in short clips and edit together; every switch of profile costs time, so use Jordan for most of it.
 
@@ -17,7 +17,7 @@ Before recording: run `npm run seed`, restart the dev server, allow the micropho
 ## 0:22 to 0:30, The answer
 
 **Voiceover**
-"Meet Somewhere: a voice-first companion for panic, intrusive thoughts and overwhelm, that adapts to each person."
+"Meet Anchor: a voice-first companion for panic, intrusive thoughts and overwhelm, that adapts to each person."
 
 **Screen:** login page, tap Jordan, land on Today (big help card, calm layout).
 
@@ -60,7 +60,7 @@ Before recording: run `npm run seed`, restart the dev server, allow the micropho
 **Screen:** You, Conversations with Juno, Delete my data.
 
 **Voiceover**
-"Private by default. Honest about what it doesn't know. Not a medical service. Somewhere, built with ElevenLabs, Gemini, Neon and Bright Data."
+"Private by default. Honest about what it doesn't know. Not a medical service. Anchor, built with ElevenLabs, Gemini, Neon and Bright Data."
 
 ---
 

@@ -7,7 +7,7 @@ import { Aurora, Toaster } from "@/components/Motion";
 
 const jakarta = Nunito_Sans({ variable: "--font-jakarta", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const newsreader = Lora({ variable: "--font-newsreader", subsets: ["latin"], weight: ["400", "500", "600"] });
-export const metadata: Metadata = { title: "Somewhere. Space to breathe", description: "A calm, guided companion for panic, racing thoughts and overwhelm, and a path to real care." };
+export const metadata: Metadata = { title: "Anchor. Space to breathe", description: "A calm, guided companion for panic, racing thoughts and overwhelm, and a path to real care." };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#FAF8F5" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

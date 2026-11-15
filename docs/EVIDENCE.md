@@ -1,6 +1,6 @@
 # What the guidance is based on (and how strong it is)
 
-Somewhere is a demo, not a medical service. Its in-the-moment guidance is **directive**: short imperative steps, no questions, no waiting. It moves from one technique to the next by itself. She can interrupt ("slower", "something else", "stop"), but never has to. The one question it can ask is a safety question, and only when she mentions a symptom that could be an emergency.
+Anchor is a demo, not a medical service. Its in-the-moment guidance is **directive**: short imperative steps, no questions, no waiting. It moves from one technique to the next by itself. She can interrupt ("slower", "something else", "stop"), but never has to. The one question it can ask is a safety question, and only when she mentions a symptom that could be an emergency.
 
 | Design choice | Basis | Strength |
 |---|---|---|
