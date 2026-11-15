@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { applyMode, getMode, type Mode } from "@/components/ThemeProvider";
 
 const when = (iso: string) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const FLOW: Record<string, string> = { panic: "Panic", intrusive: "Looping thoughts", overwhelm: "Overwhelm", unsure: "Guided grounding", checkin: "Check-in", talk: "Talk" };
@@ -13,6 +14,8 @@ function Seg({ label, value, opts, onPick }: { label: string; value: string; opt
 }
 
 export default function You() {
+  const [mode, setMode] = useState<Mode>("system");
+  useEffect(() => { setMode(getMode()); }, []);
   const router = useRouter();
   const [d, setD] = useState<any>(null);
   const [ui, setUi] = useState<any>(null);
@@ -57,6 +60,8 @@ export default function You() {
         <div><h2>How Somewhere looks for you</h2>
           <p className="mt-1 text-[14.5px] text-ink2 prose-narrow">I looked up what design research says helps people with {ui.why.conditions.map((c: string) => COND[c] ?? c).join(" and ")}, and set this up to match. Change anything that doesn't feel right.</p></div>
         <div className="card p-5 space-y-4">
+          <Seg label="Light or dark" value={mode} opts={[["system", "Match my device"], ["light", "Light"], ["dark", "Dark"]]} onPick={(v) => { applyMode(v as Mode); setMode(v as Mode); }} />
+          <div className="flex items-center justify-between gap-3"><div><p className="text-[13.5px] text-ink2">Voice</p><p className="text-[14.5px]">Pick calming voices for Juno, the guides and the diary.</p></div><Link href="/voice" className="b b-soft border border-line">Choose voices</Link></div>
           <Seg label="Spacing" value={s.density} opts={[["airy", "Roomy"], ["cozy", "Cozy"], ["compact", "Compact"]]} onPick={(v) => change("density", v)} />
           <Seg label="Movement" value={s.motion} opts={[["none", "None"], ["soft", "Gentle"], ["normal", "Normal"]]} onPick={(v) => change("motion", v)} />
           <Seg label="How much on screen" value={s.focus} opts={[["single", "Just what matters now"], ["balanced", "A bit more"]]} onPick={(v) => change("focus", v)} />

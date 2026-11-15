@@ -15,6 +15,7 @@ const Body = z.object({
   gender: z.string().max(30).default("No preference"),
   extras: z.array(z.string().max(60)).max(6).default([]),
   format: z.enum(["online", "in_person", "either"]).default("either"),
+  who: z.enum(["individuals", "practices", "either"]).default("individuals"),
   modality: z.array(z.enum(["therapy", "groups", "psychiatry", "low_cost"])).default(["therapy", "groups"]),
 });
 

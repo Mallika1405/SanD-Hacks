@@ -27,12 +27,12 @@ export async function GET(req: Request) {
   const { signed_url } = await r.json();
 
   const [p] = await q<any>("SELECT display_name, conditions FROM profiles WHERE device_id=$1", [device]);
-  const [pr] = await q<any>("SELECT prefers FROM preferences WHERE device_id=$1", [device]);
+  const [pr] = await q<any>("SELECT prefers, companion_voice_id, voice_id FROM preferences WHERE device_id=$1", [device]);
   const themes = await q<{ t: string }>("SELECT t FROM diary_entries, unnest(themes) t WHERE device_id=$1 GROUP BY t ORDER BY count(*) DESC LIMIT 3", [device]);
   const fav = pr?.prefers?.favorite_exercise ? EXERCISES.find((e) => e.id === pr.prefers.favorite_exercise)?.title : "";
   const name = p?.display_name ?? "";
   return NextResponse.json({
-    signedUrl: signed_url,
+    signedUrl: signed_url, voiceId: pr?.companion_voice_id ?? pr?.voice_id ?? null,
     vars: {
       user_name: name || "friend", conditions: (p?.conditions ?? []).map((c: string) => COND[c] ?? c).join(", ") || "not shared",
       where: s.ctx?.where ?? "not shared", what_helped: fav || "not known yet", hard_times: pr?.prefers?.hard_times ?? "not shared",

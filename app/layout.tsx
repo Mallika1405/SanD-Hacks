@@ -11,7 +11,8 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{var m=localStorage.getItem("sw_mode")||"system";var d=m==="dark"||(m==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.mode=d?"dark":"light";var u=JSON.parse(localStorage.getItem("sw_ui")||"null");if(u){var e=document.documentElement;e.dataset.palette=u.palette;e.dataset.density=u.density;e.dataset.motion=u.motion;e.dataset.focus=u.focus;e.dataset.contrast=u.contrast;e.style.setProperty("--fs",String(u.fontScale))}}catch(e){}` }} /></head>
       <body className={`${jakarta.variable} ${newsreader.variable} antialiased`}>
         <ThemeProvider />
         <Header />

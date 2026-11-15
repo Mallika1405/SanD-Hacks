@@ -28,10 +28,11 @@ export default function Voice() {
     el.onended = () => setPlaying(""); el.onerror = () => setPlaying("");
     el.play().catch(() => setPlaying(""));
   }
-  async function select(body: object) {
+  async function select(body: object, msg = "Saved.") {
     await fetch("/api/voices", { method: "POST", body: JSON.stringify(body) });
-    setSaved("Saved on this device."); load();
+    setSaved(msg); load();
   }
+  const [only, setOnly] = useState<"all" | "calming">("calming");
   async function startRec() {
     setErr("");
     try {
@@ -59,57 +60,80 @@ export default function Voice() {
   }
 
   const clone = d?.clone?.existing;
+  const A = d?.assigned ?? {};
+  const WHERE: [string, string][] = [["companion", "Juno (live talking)"], ["guide", "Guided exercises"], ["diary", "Diary"]];
+  const list = (d?.presets ?? []).filter((p: any) => only === "all" || p.calming);
+  const usedBy = (id: string) => WHERE.filter(([k]) => A[k] === id).map(([, l]) => l);
   return (
-    <main className="max-w-[760px] space-y-6 fade-in">
-      <span className="tag">Voice</span>
-      <h1 className="text-[2.4rem] leading-tight">Choose a voice</h1>
-      <p className="text-muted">Press play to hear each one. Pick the one that feels calmest.</p>
-      {!d && <p className="text-muted">Loading…</p>}
-      <ul className="space-y-3">
-        {d?.presets.map((p: any) => (
-          <li key={p.id} className="card p-4 flex items-center justify-between gap-3">
-            <div><p className="text-lg font-medium">{p.name}{d.selected.id === p.id ? " ✓" : ""}</p><p className="text-sm text-muted">{p.blurb}</p></div>
-            <div className="flex gap-2">
-              <button onClick={() => preview(p.id)} aria-label={`Preview ${p.name}`} className="px-4 min-h-12 rounded-xl bg-ground text-ink">{playing === p.id ? "Playing…" : "Play"}</button>
-              <button onClick={() => select({ voice_id: p.id })} disabled={d.selected.id === p.id} className="px-4 min-h-12 rounded-xl bg-accent text-ground font-semibold disabled:opacity-40">{d.selected.id === p.id ? "Selected" : "Use"}</button>
+    <main className="max-w-[820px] space-y-6 fade-in">
+      <div><h1 className="text-[1.8rem]">Voices</h1>
+        <p className="mt-1 text-ink2">Pick a voice that settles you. You can use one voice for everything, or a different one for Juno, the guided exercises and the diary.</p></div>
+      {!d && <p className="text-ink2">Loading…</p>}
+
+      {d && (
+        <section className="card p-5 space-y-3" aria-label="Current voices">
+          <p className="eyebrow">Right now</p>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {WHERE.map(([k, l]) => { const v = d.presets.find((p: any) => p.id === A[k]) ?? (clone && clone.id === A[k] ? { name: `${clone.name}'s voice` } : null); return <div key={k} className="card-flat p-3"><p className="text-[13px] text-ink2">{l}</p><p className="font-medium">{v?.name ?? "Custom"}</p></div>; })}
+          </div>
+          <button role="switch" aria-checked={d.soothing} onClick={() => select({ soothing: !d.soothing }, d.soothing ? "Back to a natural pace." : "Extra soothing is on: slower, softer, steadier.")} className="check-row"><span className="box">{d.soothing && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span><b>Extra soothing</b><span className="block text-[13px] text-ink2">Slower, softer and steadier. Applies to guided exercises and the diary. (Juno's live voice uses the voice you pick.)</span></span></button>
+        </section>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div className="seg" style={{ width: 260 }}><button aria-pressed={only === "calming"} onClick={() => setOnly("calming")}>Calming</button><button aria-pressed={only === "all"} onClick={() => setOnly("all")}>All voices</button></div>
+        <p className="text-[13px] text-ink2">Tap Play to hear each one.</p>
+      </div>
+
+      <ul className="grid sm:grid-cols-2 gap-3">
+        {list.map((p: any) => (
+          <li key={p.id} className="card p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div><p className="font-medium">{p.name} {p.calming && <span className="tag tag-sage ml-1">calming</span>}</p><p className="text-[13.5px] text-ink2">{p.blurb}</p><p className="text-[12px] text-ink2/80 mt-0.5">{p.tags.join(" · ")}</p></div>
+              <button onClick={() => preview(p.id)} aria-label={`Preview ${p.name}`} className="b b-soft border border-line !min-h-10">{playing === p.id ? "Playing…" : "Play"}</button>
+            </div>
+            {usedBy(p.id).length > 0 && <p className="text-[12.5px] text-sage">Used for: {usedBy(p.id).join(", ")}</p>}
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => select({ voice_id: p.id, target: "all" }, `${p.name} will speak everywhere.`)} className="chip">Use everywhere</button>
+              {WHERE.map(([k, l]) => <button key={k} onClick={() => select({ voice_id: p.id, target: k }, `${p.name} will be ${l}.`)} aria-pressed={A[k] === p.id} className="chip">{l.split(" ")[0]}</button>)}
             </div>
           </li>
         ))}
       </ul>
 
       {d?.clone?.available && (
-        <section className="card p-4 space-y-3" aria-label="A voice you trust">
-          <h2 className="text-xl font-semibold">A voice you trust</h2>
-          <p className="text-sm text-muted">Hear the guidance in a voice that feels safe, like yours or someone close to you. It only ever says Somewhere's own reviewed words, never anything typed in.</p>
+        <section className="card p-5 space-y-3" aria-label="A voice you trust">
+          <h2>A voice you trust</h2>
+          <p className="text-[14px] text-ink2">Hear the guidance in a voice that feels safe, like yours or someone close to you. It only ever says Somewhere's own words, never anything typed in.</p>
           {clone ? (
             <div className="space-y-2">
-              <p className="text-lg">{clone.name}'s voice {d.selected.kind === "clone" && "✓"}</p>
-              <p className="text-xs text-muted">Consent saved {new Date(clone.consent_at).toLocaleString()}</p>
-              <div className="flex gap-2">
-                <button onClick={() => preview(clone.id)} className="px-4 min-h-12 rounded-xl bg-ground">{playing === clone.id ? "Playing…" : "Play"}</button>
-                <button onClick={() => select({ use_clone: true })} disabled={d.selected.kind === "clone"} className="px-4 min-h-12 rounded-xl bg-accent text-ground font-semibold disabled:opacity-40">{d.selected.kind === "clone" ? "Selected" : "Use"}</button>
-                <button onClick={deleteClone} className="px-4 min-h-12 rounded-xl bg-ground text-coral">Delete</button>
+              <p className="font-medium">{clone.name}'s voice</p>
+              <p className="text-[12px] text-ink2">Consent saved {new Date(clone.consent_at).toLocaleString()}</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => preview(clone.id)} className="b b-soft border border-line">{playing === clone.id ? "Playing…" : "Play"}</button>
+                <button onClick={() => select({ use_clone: true, target: "all" }, "That voice will speak everywhere.")} className="b b-primary">Use everywhere</button>
+                <button onClick={deleteClone} className="b b-ghost !text-terra">Delete</button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <label className="block"><span className="text-sm text-muted">Whose voice is this?</span><input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Me, Mom, a friend…" className="mt-1 w-full bg-ground rounded-xl px-4 min-h-12" /></label>
-              <p className="text-sm bg-ground rounded-xl p-3 leading-snug">{PROMPT}</p>
+              <label className="block"><span className="text-[13.5px] text-ink2">Whose voice is this?</span><input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Me, Mom, a friend…" className="mt-1" /></label>
+              <p className="text-[14px] card-flat p-3 leading-snug">{PROMPT}</p>
               <div className="flex flex-wrap gap-2 items-center">
-                {!recording ? <button onClick={startRec} className="px-4 min-h-12 rounded-xl bg-ground">Record</button> : <button onClick={() => mr.current?.stop()} className="px-4 min-h-12 rounded-xl bg-coral text-ground font-semibold">Stop ({secs}s)</button>}
-                <label className="px-4 min-h-12 rounded-xl bg-ground inline-flex items-center cursor-pointer">Upload audio<input type="file" accept="audio/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setFileName(f.name); } }} /></label>
-                {fileName && <span className="text-sm text-teal">✓ {fileName}</span>}
+                {!recording ? <button onClick={startRec} className="b b-soft border border-line">Record</button> : <button onClick={() => mr.current?.stop()} className="b b-terra">Stop ({secs}s)</button>}
+                <label className="b b-soft border border-line cursor-pointer">Upload audio<input type="file" accept="audio/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setFileName(f.name); } }} /></label>
+                {fileName && <span className="text-[13.5px] text-sage">✓ {fileName}</span>}
               </div>
-              <p className="text-xs text-muted">About a minute of clear speech works best.</p>
-              <label className="flex gap-3 items-start text-sm min-h-12"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="size-6 mt-0.5" />This is my voice, or the speaker has agreed to this use.</label>
-              <button disabled={!file || !consent || !name.trim() || busy} onClick={createClone} className="w-full min-h-14 rounded-2xl bg-accent text-ground font-bold disabled:opacity-40">{busy ? "Creating…" : "Create this voice"}</button>
+              <p className="text-[12.5px] text-ink2">About a minute of clear speech works best.</p>
+              <button role="switch" aria-checked={consent} onClick={() => setConsent(!consent)} className="check-row"><span className="box">{consent && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span>This is my voice, or the speaker has agreed to this use.</span></button>
+              <button disabled={!file || !consent || !name.trim() || busy} onClick={createClone} className="b b-primary w-full">{busy ? "Creating…" : "Create this voice"}</button>
             </div>
           )}
         </section>
       )}
-      {saved && <p role="status" className="text-teal text-sm">{saved}</p>}
-      {err && <p role="alert" className="text-coral text-sm">{err}</p>}
-      <p className="text-xs text-muted">Somewhere is a demo and not a medical service or crisis line.</p>
+      {saved && <p role="status" className="text-sage text-[14px]">{saved}</p>}
+      {err && <p role="alert" className="text-terra text-[14px]">{err}</p>}
+      <p className="text-[12.5px] text-ink2">Somewhere is a demo and not a medical service or crisis line.</p>
     </main>
   );
 }

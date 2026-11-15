@@ -44,7 +44,7 @@ export default function Diary() {
   const load = useCallback(() => fetch("/api/diary").then((r) => r.json()).then((j) => setData(j)).catch(() => {}), []);
   useEffect(() => {
     load();
-    fetch("/api/voices").then((r) => r.json()).then((j) => (voice.current = j.selected.id)).catch(() => {});
+    fetch("/api/voices").then((r) => r.json()).then((j) => (voice.current = j.assigned?.diary ?? j.selected.id)).catch(() => {});
     if (!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) setSttOk(false);
     return () => { micOn.current = false; try { rec.current?.stop(); } catch {} audio.current?.pause(); };
   }, [load]);

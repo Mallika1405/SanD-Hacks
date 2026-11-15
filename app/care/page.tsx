@@ -32,6 +32,7 @@ export default function Care() {
   const [extras, setExtras] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [format, setFormat] = useState<"online" | "in_person" | "either">("either");
+  const [who, setWho] = useState<"individuals" | "practices" | "either">("individuals");
   const [res, setRes] = useState<any>(null);
   const [live, setLive] = useState("");
   const [working, setWorking] = useState(false);
@@ -66,7 +67,7 @@ export default function Care() {
     setWorking(true); setLive("Starting…");
     setTimeout(() => results.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     try {
-      const r = await fetch("/api/care/search", { method: "POST", body: JSON.stringify({ city, goals, budget, insurance, language, gender, extras, format, modality }) });
+      const r = await fetch("/api/care/search", { method: "POST", body: JSON.stringify({ city, goals, budget, insurance, language, gender, extras, format, modality, who }) });
       if (!r.ok || !r.body) throw new Error();
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
       for (;;) {
@@ -118,6 +119,10 @@ export default function Care() {
           <div className="grid sm:grid-cols-2 gap-2">{MODALITY.map((m) => { const on = modality.includes(m.id); return (
             <button key={m.id} role="checkbox" aria-checked={on} onClick={() => toggle(modality, m.id, setModality)} className="check-row"><span className="box">{on && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span><span className="block font-semibold text-[15px]">{m.title}</span><span className="block text-[13.5px] text-ink2">{m.sub}</span></span></button>); })}</div></div>
 
+        <div className="space-y-3"><h3 className="text-[1.15rem]">Who are you looking for?</h3>
+          <div className="seg max-w-lg" role="group" aria-label="Who">{([["A specific therapist", "individuals"], ["A clinic or practice", "practices"], ["Either", "either"]] as const).map(([l, v]) => <button key={v} aria-pressed={who === v} onClick={() => setWho(v)}>{l}</button>)}</div>
+          <p className="text-[13px] text-ink2">Specific therapists means named people with their credentials, from public profiles. These are unverified, so please check their license.</p></div>
+
         <div className="space-y-3"><h3 className="text-[1.15rem]"><span className="text-sage font-semibold mr-2">3</span>Insurance or budget</h3>
           <div className="flex flex-wrap gap-2">{PLANS.map((p) => <button key={p} className="chip" aria-pressed={insurance === p} onClick={() => setInsurance(insurance === p ? "" : p)}>{p}</button>)}</div>
           <div className="grid sm:grid-cols-2 gap-3 items-end">
@@ -161,7 +166,7 @@ export default function Care() {
             {res.providers.map((p: any) => (
               <article key={p.id} className="card overflow-hidden grid md:grid-cols-[1fr_auto]">
                 <div className="p-5 lg:p-6 space-y-2 border-t-4 border-sage/50 md:border-t-0 md:border-l-4">
-                  <div className="flex flex-wrap items-center gap-2"><h3 className="text-[1.5rem] leading-tight">{p.name}</h3><span className="tag tag-stone">{p.kind.replace("_", " ")}</span></div>
+                  <div className="flex flex-wrap items-center gap-2"><h3 className="text-[1.5rem] leading-tight">{p.name}</h3><span className="tag tag-stone">{p.is_individual ? "Individual therapist" : p.kind.replace("_", " ")}</span>{p.credentials && <span className="tag tag-sage">{p.credentials}</span>}</div>
                   {p.specialties?.length > 0 && <p className="text-[15px]">{p.specialties.slice(0, 5).join(" · ")}</p>}
                   <p className="text-[14px] text-ink2">{[p.location, p.telehealth === true ? "Online available" : p.telehealth === false ? "In person only" : null].filter(Boolean).join(" · ") || "Location not stated"}</p>
                   <div className="flex flex-wrap gap-2 pt-1">

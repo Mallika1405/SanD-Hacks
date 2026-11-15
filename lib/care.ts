@@ -17,9 +17,9 @@ const queriesFor = (city: string) => [
 ];
 
 const EXTRACT_SYSTEM = `You extract mental-health care listings from ONE public web page. Return JSON {"providers":[...],"groups":[...]}.
-RULES: Use ONLY facts stated on the page. If a field is not stated use null (or [] for lists). NEVER guess insurance participation, price, availability or whether they are accepting clients: copy the page's own wording into insurance_text / cost_text / availability_text, otherwise null. Do not diagnose or recommend. At most 8 providers and 8 groups.
-A provider is a therapist, practice, clinic, program or directory that people can contact. A group is a support or peer group (in person or online).
-provider = {"name","kind":"therapist"|"clinic"|"low_cost"|"directory","specialties":[string],"modalities":[string],"location":string|null,"telehealth":boolean|null,"url":string|null,"insurance_text":string|null,"cost_text":string|null,"availability_text":string|null,"notes":string|null,"quote":string}
+RULES: Use ONLY facts stated on the page. If a field is not stated use null (or [] for lists). NEVER guess insurance participation, price, availability or whether they are accepting clients: copy the page's own wording into insurance_text / cost_text / availability_text, otherwise null. Do not diagnose or recommend. At most 12 providers and 8 groups.
+A provider is either an INDIVIDUAL clinician (a named person: therapist, counselor, psychologist, psychiatrist) or an organization (practice, clinic, program, directory). If the page lists individual named clinicians, return each one as its own provider (up to 12 on a directory page); do not merge them into the practice. A group is a support or peer group (in person or online).
+provider = {"name","individual":boolean (true only for a named person),"credentials":string|null (as written, e.g. "LMFT", "PhD, Psychologist"),"kind":"therapist"|"clinic"|"low_cost"|"directory","specialties":[string],"modalities":[string],"location":string|null,"telehealth":boolean|null,"url":string|null,"insurance_text":string|null,"cost_text":string|null,"availability_text":string|null,"notes":string|null,"quote":string}
 group = {"name","kind":"support_group"|"peer","topics":[string],"format":"online"|"in_person"|"hybrid"|null,"schedule_text":string|null,"cost_text":string|null,"url":string|null,"notes":string|null,"quote":string}
 notes = languages, populations served or stated therapist gender if stated. quote = a short phrase (max 160 chars) copied from the page that supports the listing.`;
 
@@ -34,15 +34,15 @@ export async function ingestPage(pageUrl: string): Promise<{ providers: number; 
   const ex = await gemini<Extracted>(`PAGE URL: ${pageUrl}\n\nPAGE TEXT:\n${text}`, true, { system: EXTRACT_SYSTEM, timeoutMs: 40000 });
   if (!ex) return { providers: 0, groups: 0 };
   let p = 0, g = 0;
-  for (const x of (ex.providers ?? []).slice(0, 8)) {
+  for (const x of (ex.providers ?? []).slice(0, 12)) {
     if (!x?.name) continue;
     const conf = Math.min(0.6, 0.3 + (x.location ? 0.1 : 0) + (x.url ? 0.1 : 0) + (x.quote ? 0.1 : 0));
     await q(
-      `INSERT INTO providers(name,kind,specialties,modalities,location,telehealth,url,insurance_text,cost_text,availability_text,notes,quote,source_url,checked_at,verified,confidence)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),false,$14)
-       ON CONFLICT (source_url,name) DO UPDATE SET kind=$2,specialties=$3,modalities=$4,location=$5,telehealth=$6,url=$7,insurance_text=$8,cost_text=$9,availability_text=$10,notes=$11,quote=$12,checked_at=now(),confidence=$14`,
+      `INSERT INTO providers(name,kind,specialties,modalities,location,telehealth,url,insurance_text,cost_text,availability_text,notes,quote,source_url,checked_at,verified,confidence,is_individual,credentials)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),false,$14,$15,$16)
+       ON CONFLICT (source_url,name) DO UPDATE SET kind=$2,specialties=$3,modalities=$4,location=$5,telehealth=$6,url=$7,insurance_text=$8,cost_text=$9,availability_text=$10,notes=$11,quote=$12,checked_at=now(),confidence=$14,is_individual=$15,credentials=$16`,
       [str(x.name, 160), ["therapist", "clinic", "low_cost", "directory"].includes(x.kind) ? x.kind : "therapist", arr(x.specialties), arr(x.modalities), str(x.location, 160),
-        typeof x.telehealth === "boolean" ? x.telehealth : null, abs(x.url, pageUrl), str(x.insurance_text), str(x.cost_text), str(x.availability_text), str(x.notes), str(x.quote, 200), pageUrl, conf]);
+        typeof x.telehealth === "boolean" ? x.telehealth : null, abs(x.url, pageUrl), str(x.insurance_text), str(x.cost_text), str(x.availability_text), str(x.notes), str(x.quote, 200), pageUrl, conf, x.individual === true, str(x.credentials, 80)]);
     p++;
   }
   for (const x of (ex.groups ?? []).slice(0, 8)) {
@@ -85,7 +85,7 @@ export async function discover(city: string, opts: { maxPages?: number; log?: (s
 /* ---------------------------------------------------------------- matching (cache only) */
 
 export type Answers = {
-  city: string; goals: string[]; budget: "free" | "low" | "flexible"; insurance: string; modality: ("therapy" | "groups" | "psychiatry" | "low_cost")[]; language: string; gender: string; extras: string[]; format: "online" | "in_person" | "either";
+  city: string; goals: string[]; budget: "free" | "low" | "flexible"; insurance: string; modality: ("therapy" | "groups" | "psychiatry" | "low_cost")[]; language: string; gender: string; extras: string[]; format: "online" | "in_person" | "either"; who?: "individuals" | "practices" | "either";
 };
 
 const FALLBACK: Record<string, { name: string; why: string; terms: string[] }> = {
@@ -137,8 +137,12 @@ export async function rank(answers: Answers, specialties: Spec[]) {
     if (answers.format === "online" && !online && p.telehealth === false) sc -= 2;
     const im = mentions(p); if (im) sc += 3;
     if (!m.includes("psychiatry") && /psychiatr|medication management/i.test(p.name + " " + (p.specialties ?? []).join(" "))) sc -= 4;
+    const who = answers.who ?? "individuals";
+    if (who === "individuals" && !p.is_individual) return { p: { ...p, insurance_match: im }, sc: 0 };
+    if (who === "practices" && p.is_individual) return { p: { ...p, insurance_match: im }, sc: 0 };
+    if (who !== "practices" && p.is_individual) sc += 2;
     return { p: { ...p, insurance_match: im }, sc };
-  }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 8).map((x) => x.p);
+  }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 10).map((x) => x.p);
 
   const groups = grp.map((g: any) => {
     const t = hay(g.name, g.topics, g.notes, g.quote);
@@ -169,7 +173,18 @@ export function liveQueries(a: Answers, specs: Spec[]): string[] {
   const goalWords = a.goals.length ? a.goals.slice(0, 2).map((g) => g.toLowerCase()) : ["anxiety"];
   const qs: string[] = [];
   const m = a.modality?.length ? a.modality : ["therapy", "groups"];
-  if (m.includes("therapy")) { for (const t of top) qs.push(`${t} therapist ${place}${plan}`); if (HAS_PLAN(a)) qs.push(`${a.insurance} in-network therapist ${city} anxiety panic`); }
+  const who = a.who ?? "individuals";
+  if (m.includes("therapy")) {
+    if (who !== "practices") {
+      // Directories that list named clinicians (profiles), so results are specific people.
+      for (const t of top) qs.push(`licensed therapist LMFT LCSW psychologist ${t} ${place} accepting new clients${plan}`);
+      qs.push(`psychology today therapists ${goalWords[0]} ${city}${HAS_PLAN(a) ? ` ${a.insurance}` : ""}`);
+      if (a.budget !== "flexible") qs.push(`open path collective therapist ${city} sliding scale`);
+      if (a.extras.includes("LGBTQ+ affirming")) qs.push(`LGBTQ affirming therapist profile ${city} anxiety`);
+    }
+    if (who !== "individuals") for (const t of top.slice(0, 1)) qs.push(`${t} clinic practice ${place}${plan}`);
+    if (HAS_PLAN(a)) qs.push(`${a.insurance} in-network therapist ${city} anxiety panic`);
+  }
   if (m.includes("groups")) for (const g of goalWords) qs.push(`${g} support group ${a.format === "online" ? "online" : city}`);
   if (m.includes("psychiatry")) qs.push(`psychiatrist anxiety medication management ${place}${plan}`);
   if (m.includes("low_cost") || a.budget !== "flexible" || /medi-?cal|medicaid|no insurance/i.test(a.insurance)) {
@@ -178,7 +193,7 @@ export function liveQueries(a: Answers, specs: Spec[]): string[] {
   }
   if (a.extras.includes("LGBTQ+ affirming")) qs.push(`LGBTQ affirming therapist ${city} anxiety`);
   if (a.language && a.language !== "English") qs.push(`${a.language} speaking therapist ${city} anxiety`);
-  return [...new Set(qs)].slice(0, 7);
+  return [...new Set(qs)].slice(0, 8);
 }
 
 /**

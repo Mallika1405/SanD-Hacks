@@ -79,7 +79,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
     const r = await fetch(`/api/companion/start?session=${sessionId}&mode=${mode}`).catch(() => null);
     if (!r?.ok) { onFallback(); return; }
     const j = await r.json();
-    try { (conv as any).startSession({ signedUrl: j.signedUrl, connectionType: "websocket", dynamicVariables: j.vars }); setStarted(true); try { sessionStorage.setItem(`sw_live_${sessionId}`, "1"); } catch {} }
+    try { (conv as any).startSession({ signedUrl: j.signedUrl, connectionType: "websocket", dynamicVariables: j.vars, ...(j.voiceId ? { overrides: { tts: { voiceId: j.voiceId } } } : {}) }); setStarted(true); try { sessionStorage.setItem(`sw_live_${sessionId}`, "1"); } catch {} }
     catch { onFallback(); }
   }, [sessionId, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const [resume, setResume] = useState(false);

@@ -19,30 +19,42 @@ async function cloningAvailable() {
 
 export async function GET() {
   const device = await ensureDevice();
-  const [p] = await q<any>("SELECT voice_id, voice_kind, voice_name, clone_voice_id, clone_name, clone_consent_at FROM preferences WHERE device_id=$1", [device]);
+  const [p] = await q<any>("SELECT voice_id, voice_kind, voice_name, clone_voice_id, clone_name, clone_consent_at, companion_voice_id, diary_voice_id, soothing FROM preferences WHERE device_id=$1", [device]);
   return NextResponse.json({
     presets: PRESETS,
+    assigned: { guide: p?.voice_id ?? DEFAULT_VOICE, companion: p?.companion_voice_id ?? p?.voice_id ?? DEFAULT_VOICE, diary: p?.diary_voice_id ?? p?.voice_id ?? DEFAULT_VOICE },
+    soothing: !!p?.soothing,
     selected: p?.voice_id ? { id: p.voice_id, kind: p.voice_kind, name: p.voice_name } : { id: DEFAULT_VOICE, kind: "preset", name: PRESETS[0].name },
     clone: { available: await cloningAvailable(), existing: p?.clone_voice_id ? { id: p.clone_voice_id, name: p.clone_name, consent_at: p.clone_consent_at } : null },
     sample: { text: SAMPLE_LINE, sig: sign(SAMPLE_LINE) },
   });
 }
 
-const Body = z.object({ voice_id: z.string().optional(), use_clone: z.boolean().optional() });
+const Body = z.object({
+  voice_id: z.string().optional(), use_clone: z.boolean().optional(),
+  target: z.enum(["all", "companion", "guide", "diary"]).default("all"), soothing: z.boolean().optional(),
+});
+const COL = { guide: "voice_id", companion: "companion_voice_id", diary: "diary_voice_id" } as const;
 export async function POST(req: Request) {
   const p = Body.safeParse(await req.json().catch(() => ({})));
   if (!p.success) return NextResponse.json({ error: "bad request" }, { status: 400 });
   const device = await ensureDevice();
+  await q("INSERT INTO preferences(device_id) VALUES ($1) ON CONFLICT (device_id) DO NOTHING", [device]);
+  if (p.data.soothing !== undefined) { await q("UPDATE preferences SET soothing=$2, updated_at=now() WHERE device_id=$1", [device, p.data.soothing]); if (!p.data.voice_id && !p.data.use_clone) return NextResponse.json({ ok: true }); }
+  let id: string, name: string, kind: "preset" | "clone";
   if (p.data.use_clone) {
-    const r = await q(
-      `UPDATE preferences SET voice_id=clone_voice_id, voice_kind='clone', voice_name=clone_name, updated_at=now() WHERE device_id=$1 AND clone_voice_id IS NOT NULL RETURNING device_id`, [device]);
-    return r.length ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "no cloned voice" }, { status: 400 });
+    const [c] = await q<any>("SELECT clone_voice_id, clone_name FROM preferences WHERE device_id=$1", [device]);
+    if (!c?.clone_voice_id) return NextResponse.json({ error: "no cloned voice" }, { status: 400 });
+    id = c.clone_voice_id; name = c.clone_name; kind = "clone";
+  } else {
+    const preset = PRESETS.find((x) => x.id === p.data.voice_id);
+    if (!preset) return NextResponse.json({ error: "unknown voice" }, { status: 400 });
+    id = preset.id; name = preset.name; kind = "preset";
   }
-  const preset = PRESETS.find((x) => x.id === p.data.voice_id);
-  if (!preset) return NextResponse.json({ error: "unknown voice" }, { status: 400 });
-  await q(
-    `INSERT INTO preferences(device_id, voice_id, voice_kind, voice_name) VALUES ($1,$2,'preset',$3)
-     ON CONFLICT (device_id) DO UPDATE SET voice_id=$2, voice_kind='preset', voice_name=$3, updated_at=now()`,
-    [device, preset.id, preset.name]);
+  const targets = p.data.target === "all" ? (["guide", "companion", "diary"] as const) : ([p.data.target] as const);
+  for (const t of targets) {
+    await q(`UPDATE preferences SET ${COL[t]}=$2, updated_at=now() WHERE device_id=$1`, [device, id]);
+    if (t === "guide") await q("UPDATE preferences SET voice_kind=$2, voice_name=$3 WHERE device_id=$1", [device, kind, name]);
+  }
   return NextResponse.json({ ok: true });
 }
