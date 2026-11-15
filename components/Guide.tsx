@@ -11,7 +11,8 @@ type Out = {
 };
 
 const TRUST_MSG = "I'm having a hard time right now. Can you stay in touch with me?";
-const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+const plain = (t: string) => t.replace(/<break[^>]*\/>/g, " ").replace(/\s+/g, " ").trim();
+const norm = (t: string) => plain(t).toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 const b64url = (t: string) => { const b = new TextEncoder().encode(t); let s = ""; b.forEach((c) => (s += String.fromCharCode(c))); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
 const RATES = [["Slower", 0.9], ["Normal", 1], ["Faster", 1.15]] as const;
 
@@ -127,7 +128,7 @@ export default function Guide({ sessionId, first, onExit }: { sessionId: string;
   const urlOf = (s: Seg) => `/api/sos/tts?t=${b64url(s.text)}&s=${s.sig}&v=${voice.current}`;
   const warm = (s?: Seg) => { if (s) fetch(urlOf(s)).then((r) => r.arrayBuffer()).catch(() => {}); }; // load upcoming lines ahead of time
 
-  const showCaption = (t: string) => { setCaption(t); setLines((l) => (l[l.length - 1] === t ? l : [...l.slice(-3), t])); };
+  const showCaption = (t0: string) => { const t = plain(t0); setCaption(t); setLines((l) => (l[l.length - 1] === t ? l : [...l.slice(-3), t])); };
 
   const speak = async (s: Seg, my: number) => {
     showCaption(s.text); setMode("speaking"); speaking.current = true; speakingText.current = norm(s.text);

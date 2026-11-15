@@ -14,9 +14,11 @@ export async function GET() {
   const providers = await q<any>("SELECT p.id, p.name, p.source_url FROM provider_matches m JOIN providers p ON p.id=m.provider_id WHERE m.device_id=$1 ORDER BY m.created_at DESC", [device]);
   const groups = await q<any>("SELECT g.id, g.name, g.source_url FROM provider_matches m JOIN groups g ON g.id=m.group_id WHERE m.device_id=$1 ORDER BY m.created_at DESC", [device]);
   const [checkin] = await q<any>("SELECT due_at FROM checkins WHERE device_id=$1 AND done_at IS NULL ORDER BY due_at LIMIT 1", [device]);
+  const [prof] = await q<any>("SELECT display_name, conditions FROM profiles WHERE device_id=$1", [device]);
   const diary = await q<any>("SELECT id, created_at, title, feelings FROM diary_entries WHERE device_id=$1 ORDER BY created_at DESC LIMIT 3", [device]);
   const [dn] = await q<{ n: number }>("SELECT count(*)::int n FROM diary_entries WHERE device_id=$1", [device]);
   return NextResponse.json({
+    profile: prof ? { name: prof.display_name, conditions: prof.conditions } : null,
     diary, diaryCount: dn?.n ?? 0,
     sessions: sessions.map((s: any) => ({ ...s, helpful: (s.helpful_exercise_ids ?? []).map(title), tried: (s.tried ?? []).map(title) })),
     prefs: prefs ? { ...prefs, favorite: prefs.prefers?.favorite_exercise ? title(prefs.prefers.favorite_exercise) : null, hard_times: prefs.prefers?.hard_times ?? null } : null,

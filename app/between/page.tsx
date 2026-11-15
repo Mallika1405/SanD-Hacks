@@ -87,6 +87,10 @@ export default function Between() {
               {!d.saved.providers.length && !d.saved.groups.length && <p className="text-ink2">Nothing saved. <a href="/care" className="underline text-slate">Find care</a></p>}
               {[...d.saved.providers, ...d.saved.groups].map((x: any) => <a key={x.id} href={x.source_url} target="_blank" rel="noreferrer" className="block card-flat p-3 underline text-slate">{x.name}</a>)}</article>
 
+            <article className="card p-6 space-y-2"><h2 className="text-[1.6rem]">Your profile</h2>
+              <p className="text-ink2 text-[14.5px]">{d.profile?.name ? `${d.profile.name} · ` : ""}{d.profile?.conditions?.length ? d.profile.conditions.join(", ") : "Not set up yet"}</p>
+              <div className="flex flex-wrap gap-2"><a href="/welcome" className="b b-soft border border-line">Edit profile</a><a href="/tracker" className="b b-soft border border-line">Open my tracker</a></div></article>
+
             <article className="card p-6 space-y-2"><h2 className="text-[1.6rem]">Your voice</h2>
               <p className="text-ink2 text-[14.5px]">Currently: {d.prefs?.voice_name ? `${d.prefs.voice_name}${d.prefs.voice_kind === "clone" ? " (a voice you trust)" : ""}` : "default"}</p>
               <a href="/voice" className="b b-soft border border-line">Change voice</a></article>

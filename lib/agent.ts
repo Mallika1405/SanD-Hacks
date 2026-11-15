@@ -87,11 +87,11 @@ async function talkReply(text: string, recent: Ctx["recent"]): Promise<string> {
 /** Researched steps come from web pages: have Gemini say them like a person. Same steps, same count, same meaning. Falls back to the originals. */
 async function humanize(segs: Seg[], sit: string | undefined, extra = ""): Promise<Seg[]> {
   const g = await gemini<{ lines: string[] }>(
-    `Rewrite each line so a calm, warm person would say it out loud to someone who is anxious${sit ? ` (${sit})` : ""}${extra ? `. About them: ${extra}` : ""}. Keep the exact same instruction and the same number of lines. Short, spoken, contractions. No questions. No promises. No "relax" or "calm down". Lines:\n${JSON.stringify(segs.map((x) => x.text))}\nReply JSON {"lines":[...]}`,
+    `Rewrite each line so a calm, warm person would say it out loud to someone who is anxious${sit ? ` (${sit})` : ""}${extra ? `. About them: ${extra}` : ""}. Every line must stay a DIRECT INSTRUCTION that tells them exactly what to do with their body or attention right now (like "Breathe in through your nose." or "Put both feet on the floor."), never a statement about what they are doing (never "You are noticing..." or "You are feeling..."). Keep the exact same instruction and the same number of lines. Short, spoken, contractions. No questions. No promises. No "relax" or "calm down". Lines:\n${JSON.stringify(segs.map((x) => x.text))}\nReply JSON {"lines":[...]}`,
     true, { timeoutMs: 6000 });
   const lines = g?.lines;
   if (!Array.isArray(lines) || lines.length !== segs.length) return segs;
-  if (lines.some((l) => typeof l !== "string" || !l.trim() || l.length > 150 || l.includes("?") || BANNED.test(l))) return segs;
+  if (lines.some((l) => typeof l !== "string" || !l.trim() || l.length > 150 || l.includes("?") || BANNED.test(l) || /^you('re| are) (noticing|feeling|doing|breathing|sitting)/i.test(l.trim()))) return segs;
   return segs.map((x, i) => ({ ...x, text: lines[i].trim() }));
 }
 

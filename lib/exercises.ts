@@ -8,8 +8,12 @@ export type Exercise = {
 // DIRECTIVE guidance in a human voice: short, warm, spoken-style sentences. No questions, no waiting. See docs/EVIDENCE.md.
 const s = (text: string, pause_ms = 1500, listen = false): Seg => ({ text, pause_ms, ...(listen ? { listen } : {}) });
 
-/** Cyclic sighing (double inhale through the nose, long exhale): the best-supported in-the-moment breathing. Gentle, never forced. */
-const sigh = (tail: string): Seg[] => [s("Breathe in through your nose.", 1800), s("A little more air in. One more sip.", 1300), s("And let it out, long and slow, through your mouth.", 5200), s(tail, 500)];
+/** Cyclic sighing (double inhale through the nose, long exhale): the best-supported in-the-moment breathing. Gentle, never forced. Counted out loud. */
+const br = (ms: number) => `<break time="${ms / 1000}s" />`;
+const round = (tail: string): Seg[] => [
+  s(`Breathe in through your nose. ${br(700)} Two. ${br(500)} And one more small sip of air.`, 250),
+  s(`Now out through your mouth, slowly. ${br(600)} Two. ${br(650)} Three. ${br(650)} Four. ${br(650)} Five. ${br(650)} Six. ${tail}`, 500),
+];
 
 // Reviewed-exercise library. Gemini may only rephrase within these; nothing here is treatment.
 export const EXERCISES: Exercise[] = [
@@ -25,11 +29,11 @@ export const EXERCISES: Exercise[] = [
     ],
   },
   {
-    id: "exhale-breath", title: "Slow breathing", blurb: "Long exhale, no forcing", flows: ["panic", "overwhelm", "intrusive"], status: "needs human review",
+    id: "exhale-breath", title: "Slow breathing", blurb: "Long exhale, counted out loud", flows: ["panic", "overwhelm", "intrusive"], status: "needs human review",
     segments: [
-      s("Okay. Now we'll breathe together. Nice and gentle. No forcing it.", 1500),
-      ...sigh("That's it."), ...sigh("Good."), ...sigh("Again."), ...sigh("You're doing great."), ...sigh("Once more."),
-      s("Keep that slow rhythm going.", 2200),
+      s("Here's what we're going to do. Breathe in through your nose for about two seconds. Then one more small sip of air. Then let it out slowly through your mouth for about six. I'll count it with you.", 900),
+      ...round("That's it."), ...round("Again."), ...round("You're doing it."), ...round("Nice and slow."), ...round("Once more."),
+      s("Keep that slow rhythm going for as long as you like.", 2000),
     ],
   },
   {

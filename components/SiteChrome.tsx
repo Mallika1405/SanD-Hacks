@@ -1,17 +1,22 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const NAV = [
   { href: "/", label: "In the Moment" },
   { href: "/between", label: "Between Moments" },
-  { href: "/diary", label: "Voice Diary" },
+  { href: "/tracker", label: "Tracker" },
+  { href: "/diary", label: "Diary" },
   { href: "/care", label: "Find Care" },
-  { href: "/crisis", label: "Crisis Support" },
+  { href: "/crisis", label: "Crisis" },
 ];
 
 export function Header() {
   const path = usePathname();
+  const [me, setMe] = useState<any>(null);
+  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => {}); }, [path]);
+  async function logout() { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/"; }
   const on = (h: string) => (h === "/" ? path === "/" || path.startsWith("/session") || path.startsWith("/breathe") : path.startsWith(h));
   return (
     <header className="sticky top-0 z-40 bg-canvas/85 backdrop-blur-md border-b border-line">
@@ -22,19 +27,22 @@ export function Header() {
           </span>
           <span className="leading-tight hidden sm:block"><span className="serif text-[1.3rem] block">Somewhere</span><span className="text-[11px] text-ink2 tracking-wide">Space to breathe</span></span>
         </Link>
-        <nav aria-label="Main" className="hidden md:flex mx-auto items-center gap-1 p-1 rounded-2xl bg-cream border border-line">
+        <nav aria-label="Main" className="hidden lg:flex mx-auto items-center gap-1 p-1 rounded-2xl bg-cream border border-line">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined}
-              className={`px-4 h-10 inline-flex items-center rounded-xl text-[14.5px] font-medium transition ${on(n.href) ? "bg-stone text-ink" : "text-ink2 hover:text-ink hover:bg-stone/60"}`}>{n.label}</Link>
+              className={`px-3.5 h-10 inline-flex items-center whitespace-nowrap rounded-xl text-[14px] font-medium transition ${on(n.href) ? "bg-stone text-ink" : "text-ink2 hover:text-ink hover:bg-stone/60"}`}>{n.label}</Link>
           ))}
         </nav>
-        <Link href="/?sos=1" className="ml-auto md:ml-0 shrink-0 h-10 px-4 inline-flex items-center gap-2 rounded-xl bg-terrasoft text-terradeep text-[14px] font-semibold hover:bg-[#F3CFC2]">
+        {me && (me.account
+          ? <div className="ml-auto lg:ml-0 hidden sm:flex items-center gap-2 text-[13.5px]"><span className="text-ink2">{me.profile?.name ?? me.account.handle}</span><button onClick={logout} className="underline text-ink2 min-h-10">Log out</button></div>
+          : <Link href="/login" className="ml-auto lg:ml-0 hidden sm:inline-flex items-center h-10 px-3 text-[14px] font-medium text-slate hover:underline">Sign in</Link>)}
+        <Link href="/?sos=1" className="shrink-0 h-10 px-4 inline-flex items-center gap-2 rounded-xl bg-terrasoft text-terradeep text-[14px] font-semibold hover:bg-[#F3CFC2]">
           <i className="size-2 rounded-full bg-terra" aria-hidden /> SOS / Grounding
         </Link>
       </div>
-      <nav aria-label="Main" className="md:hidden flex gap-1 px-4 pb-3 overflow-x-auto">
+      <nav aria-label="Main" className="lg:hidden flex gap-1 px-4 pb-3 overflow-x-auto">
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`shrink-0 px-3.5 h-10 inline-flex items-center rounded-xl text-sm font-medium ${on(n.href) ? "bg-stone text-ink" : "bg-cream text-ink2"}`}>{n.label}</Link>
+          <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`shrink-0 px-3.5 h-10 inline-flex items-center whitespace-nowrap rounded-xl text-sm font-medium ${on(n.href) ? "bg-stone text-ink" : "bg-cream text-ink2"}`}>{n.label}</Link>
         ))}
       </nav>
     </header>

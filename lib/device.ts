@@ -20,3 +20,9 @@ export async function currentDevice(): Promise<string | null> {
   const v = (await cookies()).get(COOKIE)?.value;
   return v && /^[0-9a-f-]{36}$/.test(v) ? v : null;
 }
+
+/** Signing in points this browser at the account's device id, so all of its data follows the account. */
+export async function setDeviceCookie(id: string) {
+  (await cookies()).set(COOKIE, id, { httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 365, path: "/" });
+}
+export async function clearDeviceCookie() { (await cookies()).delete(COOKIE); }
