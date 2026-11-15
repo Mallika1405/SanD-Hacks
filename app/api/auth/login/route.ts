@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { q } from "@/lib/db";
-import { setDeviceCookie } from "@/lib/device";
+import { setDeviceCookie, setEntered } from "@/lib/device";
 import { checkPassword, normHandle } from "@/lib/auth";
 
 const Body = z.object({ handle: z.string().max(40), password: z.string().max(100) });
@@ -19,6 +19,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That username and password don't match." }, { status: 401 });
   }
   fails.delete(handle);
-  await setDeviceCookie(a.device_id);
+  await setDeviceCookie(a.device_id); await setEntered("account");
   return NextResponse.json({ ok: true, handle });
 }

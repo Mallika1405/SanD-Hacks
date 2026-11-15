@@ -26,3 +26,9 @@ export async function setDeviceCookie(id: string) {
   (await cookies()).set(COOKIE, id, { httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 365, path: "/" });
 }
 export async function clearDeviceCookie() { (await cookies()).delete(COOKIE); }
+
+/** Marks that this browser has passed the welcome screen (signed in, demo, or guest). Used to open on the login page first. */
+export async function setEntered(kind: "account" | "guest" | "demo") {
+  (await cookies()).set("sw_entered", kind, { httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30, path: "/" });
+}
+export async function clearEntered() { (await cookies()).delete("sw_entered"); }

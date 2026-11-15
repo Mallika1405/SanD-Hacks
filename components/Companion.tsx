@@ -35,6 +35,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
   const [sceneMsg, setSceneMsg] = useState("");
   const [tech, setTech] = useState<{ status: string | null; items: { title: string; source_name: string; source_url: string }[] }>({ status: null, items: [] });
   const [logged, setLogged] = useState("");
+  const [tab, setTab] = useState<"why" | "anchors" | "sources" | "sound">("why");
   const [err, setErr] = useState("");
   const [started, setStarted] = useState(false);
   const h = useRef<any>({});
@@ -147,7 +148,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
   const names = [...new Set(tech.items.map((i) => i.source_name))];
 
   return (
-    <div ref={root} className="grid lg:grid-cols-[1.45fr_1fr] gap-6 items-start fade-in">
+    <div ref={root} className="grid lg:grid-cols-[1.5fr_1fr] gap-5 items-start fade-in">
       <section className="card p-5 lg:p-7" aria-label="Conversation">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-[14.5px] font-medium"><i className={`size-2.5 rounded-full ${conv.status === "connected" ? "bg-sage" : "bg-[#CFC9BB]"}`} aria-hidden />Juno · {status}</p>
@@ -183,35 +184,23 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
         {logged && <p role="status" className="mt-3 text-sage text-[14px]">✓ {logged}. <a className="underline" href="/tracker">See my tracker</a></p>}
       </section>
 
-      <aside className="space-y-6">
+      <aside className="space-y-4">
         {suggest && PAGES[suggest] && (
-          <article className="card p-5"><p className="eyebrow">Juno suggests</p><a href={PAGES[suggest].href} className="mt-1 block"><p className="serif text-[1.35rem]">{PAGES[suggest].label}</p><p className="text-[14.5px] text-ink2">{PAGES[suggest].sub}</p></a></article>
+          <a href={PAGES[suggest].href} className="card p-4 block"><p className="text-[13px] text-ink2">Juno suggests</p><p className="font-medium">{PAGES[suggest].label}</p><p className="text-[13.5px] text-ink2">{PAGES[suggest].sub}</p></a>
         )}
-        <article className="card p-6">
-          <h2 className="text-[1.5rem]">Why this works</h2>
-          <p className="mt-2 text-[15.5px] text-ink2 leading-relaxed">{why || "As we go, I'll tell you why a technique helps, and how strong the evidence really is."}</p>
-        </article>
-        <article className="card p-6">
-          <div className="flex items-baseline justify-between"><h2 className="text-[1.5rem]">Room anchors</h2><span className="text-[12px] text-ink2">Tap to anchor</span></div>
-          <div className="mt-3 space-y-2">
-            {(anchors.length ? anchors : ["Feel both feet on the floor", "Let your shoulders drop", "Notice one thing you can see"]).map((a) => (
-              <button key={a} role="checkbox" aria-checked={!!checked[a]} onClick={() => setChecked((c) => ({ ...c, [a]: !c[a] }))} className="check-row">
-                <span className="box">{checked[a] && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span className="text-[15px]">{a}</span>
-              </button>
-            ))}
+        <article className="card p-5">
+          <div className="seg" role="tablist" aria-label="Details">{([["why", "Why it works"], ["anchors", "Anchors"], ["sources", "Sources"], ["sound", "Sound"]] as const).map(([k, l]) => <button key={k} role="tab" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}</div>
+          <div className="mt-4 min-h-[9rem]">
+            {tab === "why" && <p className="text-[15px] text-ink2 leading-relaxed">{why || "As we go, I'll tell you why a technique helps, and how strong the evidence really is."}</p>}
+            {tab === "anchors" && <div className="space-y-2">{(anchors.length ? anchors : ["Feel both feet on the floor", "Let your shoulders drop", "Notice one thing you can see"]).map((a) => (
+              <button key={a} role="checkbox" aria-checked={!!checked[a]} onClick={() => setChecked((c) => ({ ...c, [a]: !c[a] }))} className="check-row"><span className="box">{checked[a] && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span className="text-[14.5px]">{a}</span></button>))}</div>}
+            {tab === "sources" && <div className="text-[14.5px] space-y-2"><p className="text-ink2">When your situation is specific, Juno looks up techniques on trusted health sites. They aren't reviewed by a clinician.</p>
+              <p>{tech.status === "pending" ? <span className="text-sage font-medium">● Looking them up right now…</span> : tech.items.length ? <span className="text-sage font-medium">{tech.items.length} techniques from {names.slice(0, 2).join(" and ")}</span> : <span className="text-ink2">Nothing looked up yet.</span>}</p>
+              <ul className="space-y-1">{tech.items.slice(0, 4).map((i) => <li key={i.title + i.source_url}><a className="underline text-slate" target="_blank" rel="noreferrer" href={i.source_url}>{i.title}</a> <span className="text-ink2">· {i.source_name}</span></li>)}</ul></div>}
+            {tab === "sound" && <div className="space-y-3"><p className="text-[14.5px] text-ink2">Calming sound made with ElevenLabs, playing softly under our conversation.</p>
+              <div className="flex flex-wrap gap-2">{SCENES.map(([k, l]) => <button key={k} className="chip" aria-pressed={scene === k} onClick={() => playScene(scene === k ? "off" : k)}>{l}</button>)}</div>
+              {sceneMsg && <p className="text-[13px] text-ink2">{sceneMsg}</p>}</div>}
           </div>
-        </article>
-        <article className="card p-6">
-          <div className="flex items-center justify-between gap-2"><h2 className="text-[1.5rem]">Trusted sources</h2><span className="tag tag-stone">Bright Data · Gemini</span></div>
-          <p className="mt-2 text-[14.5px] text-ink2">When your situation is specific, Juno looks up techniques on trusted health sites. They aren't reviewed by a clinician.</p>
-          <p className="mt-3 text-[14.5px]">{tech.status === "pending" ? <span className="text-sage font-medium">● Looking them up right now…</span> : tech.items.length ? <span className="text-sage font-medium">✓ {tech.items.length} techniques from {names.slice(0, 2).join(" and ")}</span> : <span className="text-ink2">Nothing looked up yet.</span>}</p>
-          <ul className="mt-2 space-y-1">{tech.items.slice(0, 4).map((i) => <li key={i.title + i.source_url} className="text-[14px]"><a className="underline text-slate" target="_blank" rel="noreferrer" href={i.source_url}>{i.title}</a> <span className="text-ink2">· {i.source_name}</span></li>)}</ul>
-        </article>
-        <article className="card p-6">
-          <h2 className="text-[1.5rem]">Soundscape</h2>
-          <p className="mt-1 text-[14px] text-ink2">Calming sound, made with ElevenLabs, playing softly under our conversation.</p>
-          <div className="mt-3 flex flex-wrap gap-2">{SCENES.map(([k, l]) => <button key={k} className="chip" aria-pressed={scene === k} onClick={() => playScene(scene === k ? "off" : k)}>{l}</button>)}</div>
-          {sceneMsg && <p className="mt-2 text-[13px] text-ink2">{sceneMsg}</p>}
         </article>
       </aside>
 

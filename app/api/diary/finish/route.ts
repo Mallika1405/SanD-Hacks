@@ -3,6 +3,7 @@ import { z } from "zod";
 import { gemini } from "@/lib/gemini";
 import { assessSafety } from "@/lib/safety";
 import { out } from "@/lib/speech";
+import { diaryRisk } from "@/lib/risk";
 
 export const maxDuration = 30;
 const Body = z.object({ transcript: z.string().min(10).max(20000) });
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
   const p = Body.safeParse(await req.json().catch(() => ({})));
   if (!p.success) return NextResponse.json({ error: "Not enough to reflect on yet." }, { status: 400 });
   const t = p.data.transcript;
-  const level = await assessSafety(t.slice(-3000));
+  const [level, risk] = await Promise.all([assessSafety(t.slice(-3000)), diaryRisk(t)]);
   const g = await gemini<Draft>(`Voice diary transcript:\n"""${t.slice(0, 12000)}"""`, true, {
     system: `You help a person reflect after they spoke freely in a voice diary. You are NOT a chatbot and you give no advice. Write in second person ("You...") in warm, plain, non-clinical language. Never diagnose. Never promise anything. Never judge. Never invent details that were not said.
 Return JSON {"title": string (max 6 words, no diagnosis), "summary": string (2 to 4 sentences: what was going on and how it felt, using their own details), "heard": string (2 to 3 sentences starting "What I heard is" that name the feelings gently, like "a lot of pressure, with tiredness underneath"), "feelings": string[] (up to 5 single lowercase feeling words), "themes": string[] (up to 4 short lowercase topics like "work" or "sleep"), "quote": string (a short phrase of max 15 words copied from the transcript, or ""), "intensity": number (1 to 10, how intense the distress seemed)}`, timeoutMs: 25000 });
@@ -25,5 +26,5 @@ Return JSON {"title": string (max 6 words, no diagnosis), "summary": string (2 t
     intensity: Math.min(10, Math.max(1, Math.round(Number(g.intensity) || 5))),
   };
   const say = draft.heard ? out([{ text: draft.heard, pause_ms: 0 }]) : [];
-  return NextResponse.json({ draft, say, crisis: level === "crisis" ? "self_harm" : level === "medical" ? "medical" : null });
+  return NextResponse.json({ draft: { ...draft, risk: risk.risk, risk_note: risk.note }, say, crisis: level === "crisis" || risk.risk === "urgent" ? (level === "medical" ? "medical" : "self_harm") : level === "medical" ? "medical" : null });
 }

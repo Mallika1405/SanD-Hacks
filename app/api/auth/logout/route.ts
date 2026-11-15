@@ -1,4 +1,4 @@
 import { NextResponse } from "next/server";
-import { clearDeviceCookie } from "@/lib/device";
+import { clearDeviceCookie, clearEntered } from "@/lib/device";
 
-export async function POST() { await clearDeviceCookie(); return NextResponse.json({ ok: true }); }
+export async function POST() { await clearDeviceCookie(); await clearEntered(); return NextResponse.json({ ok: true }); }

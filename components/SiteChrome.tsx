@@ -4,72 +4,48 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const NAV = [
-  { href: "/", label: "In the Moment" },
-  { href: "/between", label: "Between Moments" },
-  { href: "/tracker", label: "Tracker" },
+  { href: "/", label: "Today" },
+  { href: "/now", label: "Talk" },
   { href: "/diary", label: "Diary" },
-  { href: "/care", label: "Find Care" },
-  { href: "/crisis", label: "Crisis" },
+  { href: "/tracker", label: "Tracker" },
+  { href: "/therapy", label: "Therapy" },
+  { href: "/care", label: "Find care" },
 ];
 
 export function Header() {
   const path = usePathname();
   const [me, setMe] = useState<any>(null);
   useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => {}); }, [path]);
-  async function logout() { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/"; }
-  const on = (h: string) => (h === "/" ? path === "/" || path.startsWith("/session") || path.startsWith("/breathe") : path.startsWith(h));
+  if (path === "/login") return null;
+  const on = (h: string) => (h === "/" ? path === "/" : path.startsWith(h) || (h === "/now" && path.startsWith("/session")));
   return (
-    <header className="sticky top-0 z-40 bg-canvas/85 backdrop-blur-md border-b border-line">
-      <div className="max-w-[1160px] mx-auto px-5 lg:px-8 h-[72px] flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-3 shrink-0" aria-label="Somewhere home">
-          <span className="grid place-items-center size-10 rounded-xl bg-sage text-white" aria-hidden>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="7.5" strokeDasharray="2 3" /></svg>
-          </span>
-          <span className="leading-tight hidden sm:block"><span className="serif text-[1.3rem] block">Somewhere</span><span className="text-[11px] text-ink2 tracking-wide">Space to breathe</span></span>
-        </Link>
-        <nav aria-label="Main" className="hidden lg:flex mx-auto items-center gap-1 p-1 rounded-2xl bg-cream border border-line">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined}
-              className={`px-3.5 h-10 inline-flex items-center whitespace-nowrap rounded-xl text-[14px] font-medium transition ${on(n.href) ? "bg-stone text-ink" : "text-ink2 hover:text-ink hover:bg-stone/60"}`}>{n.label}</Link>
-          ))}
+    <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur border-b border-line">
+      <div className="max-w-[1040px] mx-auto px-4 lg:px-6 h-14 flex items-center gap-3">
+        <Link href="/" className="serif text-[1.25rem] shrink-0" aria-label="Somewhere, home">somewhere</Link>
+        <nav aria-label="Main" className="hidden md:flex items-center gap-0.5 ml-3">
+          {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`px-3 h-9 inline-flex items-center rounded-lg text-[14px] whitespace-nowrap ${on(n.href) ? "bg-stone font-medium text-ink" : "text-ink2 hover:text-ink"}`}>{n.label}</Link>)}
         </nav>
-        {me && (me.account
-          ? <div className="ml-auto lg:ml-0 hidden sm:flex items-center gap-2 text-[13.5px]"><span className="text-ink2">{me.profile?.name ?? me.account.handle}</span><button onClick={logout} className="underline text-ink2 min-h-10">Log out</button></div>
-          : <Link href="/login" className="ml-auto lg:ml-0 hidden sm:inline-flex items-center h-10 px-3 text-[14px] font-medium text-slate hover:underline">Sign in</Link>)}
-        <Link href="/?sos=1" className="shrink-0 h-10 px-4 inline-flex items-center gap-2 rounded-xl bg-terrasoft text-terradeep text-[14px] font-semibold hover:bg-[#F3CFC2]">
-          <i className="size-2 rounded-full bg-terra" aria-hidden /> SOS / Grounding
-        </Link>
+        <div className="ml-auto flex items-center gap-2">
+          <Link href="/you" className="hidden sm:inline-flex items-center h-9 px-3 rounded-lg text-[14px] text-ink2 hover:text-ink">{me?.profile?.name ?? me?.account?.handle ?? "You"}</Link>
+          <Link href="/now?sos=1" className="h-9 px-3.5 inline-flex items-center rounded-lg bg-terrasoft text-terradeep text-[14px] font-semibold hover:bg-[#F3CFC2]">I need help now</Link>
+        </div>
       </div>
-      <nav aria-label="Main" className="lg:hidden flex gap-1 px-4 pb-3 overflow-x-auto">
-        {NAV.map((n) => (
-          <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`shrink-0 px-3.5 h-10 inline-flex items-center whitespace-nowrap rounded-xl text-sm font-medium ${on(n.href) ? "bg-stone text-ink" : "bg-cream text-ink2"}`}>{n.label}</Link>
-        ))}
+      <nav aria-label="Main" className="md:hidden flex gap-1 px-3 pb-2 overflow-x-auto">
+        {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`shrink-0 px-3 h-9 inline-flex items-center rounded-lg text-[14px] ${on(n.href) ? "bg-stone font-medium" : "text-ink2"}`}>{n.label}</Link>)}
+        <Link href="/you" className="shrink-0 px-3 h-9 inline-flex items-center rounded-lg text-[14px] text-ink2">You</Link>
       </nav>
     </header>
   );
 }
 
-export function SafetyBar() {
-  return (
-    <div className="max-w-[1160px] mx-auto px-5 lg:px-8 pt-4">
-      <div className="rounded-2xl bg-stone/80 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <i className="size-2.5 rounded-full bg-terra shrink-0" aria-hidden />
-        <p className="text-[14.5px] text-ink flex-1 min-w-[220px]">Need a person right now? Free, confidential support is here.</p>
-        <div className="flex gap-2">
-          <a href="tel:988" className="b b-terra !min-h-[40px] !px-4 !text-[14px]">Call 988</a>
-          <a href="sms:741741?body=HOME" className="b b-soft !min-h-[40px] !px-4 !text-[14px] border border-line">Text HOME to 741741</a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function Footer() {
+  const path = usePathname();
+  if (path === "/login") return null;
   return (
-    <footer className="mt-16 bg-stone/70 border-t border-line">
-      <div className="max-w-[1160px] mx-auto px-5 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-4">
-        <p className="text-[13.5px] text-ink2 max-w-[62ch]">Somewhere is a supportive companion demo and not a medical service or crisis line. If you are in immediate danger, call 911. For emotional crisis, call or text 988.</p>
-        <div className="flex gap-6 text-[12.5px] text-ink2"><span>Safety checks on every message</span><span>Private by default</span></div>
+    <footer className="mt-14 border-t border-line">
+      <div className="max-w-[1040px] mx-auto px-4 lg:px-6 py-5 flex flex-wrap items-center justify-between gap-3 text-[13px] text-ink2">
+        <p className="max-w-[60ch]">Somewhere is a demo, not a medical service. If you're in danger, call 911. For emotional crisis, call or text <a className="underline" href="tel:988">988</a>.</p>
+        <Link href="/crisis" className="underline">Crisis support</Link>
       </div>
     </footer>
   );

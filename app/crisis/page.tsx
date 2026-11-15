@@ -75,7 +75,7 @@ export default function Crisis() {
                 <li key={t} className="flex gap-3 card-flat p-4"><span className="size-7 rounded-full bg-sagedeep text-white grid place-items-center text-sm font-semibold shrink-0">{i + 1}</span><span><span className="block font-semibold">{t}</span><span className="text-[14.5px] text-ink2">{d}</span></span></li>
               ))}
             </ol>
-            <a href="/?sos=1" className="b b-primary w-full mt-4">Guide me through it</a>
+            <a href="/now?sos=1" className="b b-primary w-full mt-4">Guide me through it</a>
           </article>
           <article className="card-flat p-5">
             <h3 className="text-[1.2rem]">If anyone is in immediate danger</h3>

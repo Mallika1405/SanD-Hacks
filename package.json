@@ -10,7 +10,9 @@
     "migrate": "tsx scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
     "audio": "tsx scripts/gen-audio.ts",
-    "test:agent": "tsx scripts/test-agent.ts"
+    "test:agent": "tsx scripts/test-agent.ts",
+    "seed": "tsx scripts/seed.ts",
+    "ui:research": "tsx scripts/ui-research.ts"
   },
   "dependencies": {
     "@elevenlabs/react": "^1.22.1",

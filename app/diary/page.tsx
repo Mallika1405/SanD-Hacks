@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Seg = { text: string; pause_ms: number; sig: string };
-type Draft = { title: string; summary: string; heard: string; feelings: string[]; themes: string[]; quote: string; intensity: number };
-type Entry = { id: string; created_at: string; title: string; summary: string; heard: string; feelings: string[]; themes: string[]; intensity: number | null; quote: string | null; has_transcript: boolean };
+type Draft = { title: string; summary: string; heard: string; feelings: string[]; themes: string[]; quote: string; intensity: number; risk?: string; risk_note?: string | null };
+type Entry = { id: string; created_at: string; title: string; summary: string; heard: string; feelings: string[]; themes: string[]; intensity: number | null; quote: string | null; has_transcript: boolean; risk?: string; risk_note?: string | null };
 
 const b64url = (t: string) => { const b = new TextEncoder().encode(t); let s = ""; b.forEach((c) => (s += String.fromCharCode(c))); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -21,7 +21,8 @@ export default function Diary() {
   const [keep, setKeep] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftSay, setDraftSay] = useState<Seg[]>([]);
-  const [data, setData] = useState<{ entries: Entry[]; patterns: any; listen: Seg[] } | null>(null);
+  const [data, setData] = useState<{ entries: Entry[]; patterns: any; listen: Seg[]; signals: { level: string; text: string; action: string }[]; progress: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [obs, setObs] = useState("");
   const [crisis, setCrisis] = useState<null | "self_harm" | "medical">(null);
   const [err, setErr] = useState("");
@@ -172,6 +173,19 @@ export default function Diary() {
         </ul>
       </section>
 
+      {data && (data.signals.length > 0 || data.progress === "improving") && (
+        <section className="card p-5 space-y-2" style={data.signals.length ? { background: "var(--terra-soft)" } : { background: "var(--mint-soft)" }} aria-label="What I've noticed">
+          {data.signals.map((sg) => (
+            <div key={sg.text} className="space-y-2"><p className="font-medium">Something worth a second look</p><p className="text-[14.5px]">{sg.text} You don't have to carry this alone.</p>
+              <div className="flex flex-wrap gap-2">{sg.action === "crisis" ? <><a href="tel:988" className="b b-terra">Call or text 988</a><a href="tel:911" className="b b-soft">Call 911 if you're in danger</a></> : <>
+                <button onClick={async () => { try { await navigator.clipboard.writeText("Hi, I've been having a harder time lately and wanted to tell you before our next session. I've been writing about it in my diary and can share what I've written if that would help."); setCopied(true); } catch {} }} className="b b-primary">{copied ? "Copied. Paste it to your therapist." : "Copy a note to my therapist"}</button>
+                <a href="/care" className="b b-soft">Find someone to talk to</a><a href="tel:988" className="b b-ghost">Call or text 988</a></>}</div></div>
+          ))}
+          {data.signals.length === 0 && data.progress === "improving" && <p className="text-[14.5px]"><b>Your last few entries have felt lighter</b> than the ones before. That's worth noticing.</p>}
+          {data.signals.length > 0 && data.progress === "improving" && <p className="text-[13.5px] text-ink2">Your most recent entries have felt a little lighter, which is a good sign.</p>}
+        </section>
+      )}
+
       <div className="grid lg:grid-cols-[1.45fr_1fr] gap-6 items-start">
         {/* ---------- recorder ---------- */}
         <section className="card p-6 lg:p-7 space-y-5" aria-label="Recorder">
@@ -229,13 +243,14 @@ export default function Diary() {
               </div>
             )}
           </article>
-          <article className="card-flat p-5 text-[14px] text-ink2"><p className="font-semibold text-ink">Prefer to be guided?</p><p className="mt-1">If it's loud in your head right now, start with <a className="underline text-slate" href="/?sos=1">a guided grounding</a> first. The diary will be here after.</p></article>
+          <article className="card-flat p-5 text-[14px] text-ink2"><p className="font-semibold text-ink">Prefer to be guided?</p><p className="mt-1">If it's loud in your head right now, start with <a className="underline text-slate" href="/now?sos=1">a guided grounding</a> first. The diary will be here after.</p></article>
         </aside>
       </div>
 
       {/* ---------- review ---------- */}
       {phase === "review" && draft && (
         <section className="card p-6 lg:p-8 space-y-5 fade-in" aria-label="What I heard">
+          {draft.risk && draft.risk !== "none" && <div className="card-flat p-4" style={{ background: "var(--terra-soft)" }}><p className="font-medium">{draft.risk === "urgent" ? "I want to make sure you have support right now." : "Something here sounds heavy."}</p><p className="text-[14.5px] mt-1">{draft.risk_note}</p><div className="mt-2 flex flex-wrap gap-2"><a href="tel:988" className="b b-terra">Call or text 988</a>{draft.risk === "urgent" && <a href="tel:911" className="b b-soft">Call 911 if you're in danger</a>}<a href="/care" className="b b-soft">Find someone to talk to</a></div></div>}
           <div><p className="eyebrow">What I heard</p><p className="serif mt-2 text-[1.5rem] leading-snug prose-narrow">{draft.heard}</p>
             {draftSay[0] && <button onClick={() => say(draftSay[0] as Seg, 0.95)} className="b b-soft border border-line mt-3">Read it to me</button>}</div>
           <div className="divider pt-5 grid lg:grid-cols-2 gap-5">
@@ -262,8 +277,8 @@ export default function Diary() {
         <div className="grid md:grid-cols-2 gap-4">
           {data?.entries.map((e) => (
             <article key={e.id} className="card p-5 space-y-2">
-              <div className="flex items-start justify-between gap-3"><div><p className="text-[12.5px] text-ink2">{when(e.created_at)}</p><h3 className="text-[1.4rem] leading-tight">{e.title}</h3></div>{e.intensity != null && <span className="tag tag-stone">{e.intensity}/10</span>}</div>
-              <p className="text-[14.5px] text-ink2">{e.summary}</p>
+              <div className="flex items-start justify-between gap-3"><div><p className="text-[12.5px] text-ink2">{when(e.created_at)}</p><h3 className="text-[1.4rem] leading-tight">{e.title}</h3></div><div className="flex items-center gap-1.5">{e.risk && e.risk !== "none" && <span className="tag tag-terra">Worth a second look</span>}{e.intensity != null && <span className="tag tag-stone">{e.intensity}/10</span>}</div></div>
+              <p className="text-[14.5px] text-ink2">{e.summary}</p>{e.risk_note && e.risk !== "none" && <p className="text-[13.5px] text-terradeep">{e.risk_note}</p>}
               <div className="flex flex-wrap gap-1.5">{e.feelings.map((f) => <span key={f} className="tag tag-sage">{f}</span>)}{e.themes.map((f) => <span key={f} className="tag">{f}</span>)}</div>
               <div className="flex justify-between items-center pt-1"><span className="text-[12px] text-ink2">{e.has_transcript ? "Full transcript kept" : "Summary only"}</span><button onClick={() => remove(e.id)} className="text-[13px] text-terra underline min-h-10">Delete</button></div>
             </article>

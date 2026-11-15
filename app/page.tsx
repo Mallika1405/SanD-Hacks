@@ -1,111 +1,121 @@
 "use client";
-import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Guide from "@/components/Guide";
-import Companion from "@/components/Companion";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
-type Card = { flow: string; title: string; body: string; tag: string; icon: string };
-const CARDS: Record<string, Card> = {
-  panic: { flow: "panic", title: "Panic & Bodily Dread", body: "Racing pulse, cold sweat, fast breathing, a tight, fearful body.", tag: "Slow breathing & grounding", icon: "M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7" },
-  intrusive: { flow: "intrusive", title: "Looping & Sticky Thoughts", body: "Intrusive thoughts, urges to check or seek reassurance, spirals.", tag: "Letting thoughts and urges pass", icon: "M12 4a6 6 0 0 0-3 11v3h6v-3a6 6 0 0 0-3-11Zm-2 16h4" },
-  overwhelm: { flow: "overwhelm", title: "Sensory Overwhelm", body: "Too much at once. Too loud, too bright, shut down, can't cope.", tag: "Gentle 5-4-3-2-1", icon: "M4 13v-1a8 8 0 0 1 16 0v1M4 13h3v5H4zm13 0h3v5h-3z" },
-};
-const WHERE = ["at home", "at work or school", "out in public", "in bed"] as const;
+const MOODS: [string, number, number][] = [["Calm", 1, 5], ["A bit uneasy", 3, 4], ["Anxious", 5, 3], ["Very anxious", 7, 2], ["Panicking", 9, 1]];
+const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: "long" });
+const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const inDays = (iso: string) => { const d = Math.round((new Date(iso).getTime() - Date.now()) / 864e5); return d <= 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`; };
 
-function Home() {
-  const router = useRouter();
-  const sos = useSearchParams().get("sos");
-  const [session, setSession] = useState<{ id: string; flow: string } | null>(null);
-  const [scripted, setScripted] = useState(false);
-  const [where, setWhere] = useState<string | null>(null);
-  const [busy, setBusy] = useState("");
-  const [err, setErr] = useState("");
-  const [me, setMe] = useState<{ account: any; profile: { name: string | null; conditions: string[]; onboarded: boolean } | null } | null>(null);
-  const auto = useRef(false);
+function weekLine(kind: string, logs: any[]) {
+  const wk = (a: number, b: number) => logs.filter((l) => { const age = (Date.now() - new Date(l.created_at).getTime()) / 864e5; return age >= a && age < b; }).map((l) => l.data);
+  const now = wk(0, 7), prev = wk(7, 14);
+  if (kind === "ocd_urge") {
+    if (!now.length) return "No urges logged this week. If one comes up, logging it takes under a minute.";
+    const good = (a: any[]) => a.filter((x) => x.response !== "did").length;
+    return `This week you delayed or resisted ${good(now)} of ${now.length} urges${prev.length ? `, compared with ${good(prev)} of ${prev.length} the week before` : ""}.`;
+  }
+  if (kind === "panic_episode") {
+    if (!now.length) return "No panic episodes logged this week.";
+    const avg = (a: any[]) => Math.round(a.reduce((s, x) => s + x.minutes, 0) / a.length);
+    return `${now.length} panic episode${now.length > 1 ? "s" : ""} this week, lasting about ${avg(now)} minutes each${prev.length ? ` (${avg(prev)} the week before)` : ""}.`;
+  }
+  if (!now.length) return "Nothing logged this week yet.";
+  const avg = (a: any[]) => (a.reduce((s, x) => s + x.anxiety, 0) / a.length).toFixed(1);
+  return `Your anxiety has averaged ${avg(now)} out of 10 this week${prev.length ? `, versus ${avg(prev)} last week` : ""}.`;
+}
+
+export default function Today() {
+  const [me, setMe] = useState<any>(null);
+  const [th, setTh] = useState<any>(null);
+  const [dy, setDy] = useState<any>(null);
+  const [tr, setTr] = useState<{ kind: string; logs: any[] } | null>(null);
+  const [due, setDue] = useState<any>(null);
+  const [mood, setMood] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch("/api/research/warm").catch(() => {}); // pre-fetch trusted-source techniques (sends no personal data)
-    fetch("/api/auth/me").then((r) => r.json()).then(setMe).catch(() => setMe({ account: null, profile: null }));
+    fetch("/api/auth/me").then((r) => r.json()).then((m) => {
+      setMe(m);
+      const c: string[] = m.profile?.conditions ?? [];
+      const kind = c.includes("ocd") ? "ocd_urge" : c.includes("panic") ? "panic_episode" : "daily";
+      fetch(`/api/tracker?kind=${kind}`).then((r) => r.json()).then((j) => setTr({ kind, logs: j.logs }));
+    }).catch(() => setMe({}));
+    fetch("/api/therapy").then((r) => r.json()).then(setTh).catch(() => {});
+    fetch("/api/diary").then((r) => r.json()).then(setDy).catch(() => {});
+    fetch("/api/checkins/due").then((r) => r.json()).then((j) => setDue(j.due)).catch(() => {});
+    fetch("/api/research/warm").catch(() => {});
   }, []);
 
-  async function start(flow: string) {
-    setBusy(flow); setErr(""); setScripted(false);
-    try {
-      const res = await fetch("/api/sos/start", { method: "POST", body: JSON.stringify({ flow, where: where ?? undefined }) });
-      if (!res.ok) throw new Error();
-      const s = await res.json();
-      setSession(null); setTimeout(() => setSession({ id: s.id, flow }), 0);
-    } catch { setErr("I couldn't start. Please try again."); }
-    setBusy("");
-  }
-  useEffect(() => { if (sos && !auto.current) { auto.current = true; start("panic"); router.replace("/"); } }, [sos]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const conds = me?.profile?.conditions ?? [];
-  const order = conds.includes("ocd") ? ["intrusive", "panic", "overwhelm"] : conds.includes("overwhelm") || conds.includes("gad") ? ["overwhelm", "panic", "intrusive"] : ["panic", "intrusive", "overwhelm"];
   const name = me?.profile?.name;
-  const exit = () => setSession(null);
+  const h = new Date().getHours();
+  const hello = h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const conds: string[] = me?.profile?.conditions ?? [];
+  const plan = th?.plan, open = (th?.homework ?? []).filter((x: any) => !x.done_at);
+  const signal = dy?.signals?.[0];
+
+  async function logMood(i: number) {
+    setMood(i);
+    const [, anx, m] = MOODS[i];
+    await fetch("/api/tracker", { method: "POST", body: JSON.stringify({ kind: "daily", data: { mood: m, anxiety: anx, helped: [] } }) }).catch(() => {});
+  }
+  async function copyNote() {
+    const t = "Hi, I've been struggling more lately and wanted to let you know before our next session. I've been keeping notes in my diary and can share them if that would help.";
+    try { await navigator.clipboard.writeText(t); setCopied(true); } catch {}
+  }
 
   return (
-    <div className="space-y-8 fade-in">
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="eyebrow">{name ? `Hi, ${name}` : "Immediate step 1 of 1"}</p>
-          <h1 className="mt-1 text-[2.3rem] lg:text-[2.8rem] leading-[1.1]">What does your body need right now?</h1>
-          <p className="mt-2 text-ink2 prose-narrow">Tap what fits closest and I'll start talking with you. You don't have to explain anything.</p>
-        </div>
-        <span className="tag tag-stone">Zero typing needed</span>
+    <div className="max-w-[640px] mx-auto space-y-8 fade-in">
+      <section className="pt-2">
+        <h1>{hello}{name ? `, ${name}` : ""}.</h1>
+        <p className="mt-1.5 text-ink2 text-[1.02rem]">
+          {!me ? " " : mood != null && mood >= 3 ? "That sounds like a lot right now. I'm here if you want company." : signal ? "I noticed something in your diary I'd like to check in about." : plan?.next_at ? `Your next session is ${day(plan.next_at)}, ${inDays(plan.next_at)}.` : "How's your head today?"}
+        </p>
       </section>
 
-      {me && !me.profile?.onboarded && !session && (
-        <a href="/welcome" className="card-flat p-4 flex flex-wrap items-center justify-between gap-3"><span className="text-[15px]"><b>Make this yours.</b> Tell me what you're working through so I can tailor the guidance and your tracker.</span><span className="b b-primary !min-h-[40px]">Set up my profile</span></a>
-      )}
-
-      <section aria-label="Where are you, optional" className="flex flex-wrap items-center gap-2">
-        <span className="text-[14px] text-ink2 mr-1">Where are you? <span className="text-ink2/70">(optional)</span></span>
-        {WHERE.map((w) => <button key={w} className="chip" aria-pressed={where === w} onClick={() => setWhere(where === w ? null : w)}>{w[0].toUpperCase() + w.slice(1)}</button>)}
+      <section className="flex flex-wrap gap-2.5">
+        <Link href="/now?sos=1" className="b b-primary">I need a hand right now</Link>
+        <Link href="/now?mode=talk" className="b b-soft border border-line">Just talk with Juno</Link>
+        <Link href="/diary" className="b b-soft border border-line">Open my diary</Link>
       </section>
 
-      <section className="grid md:grid-cols-3 gap-4" aria-label="What are you feeling">
-        {order.map((k) => {
-          const c = CARDS[k]; const active = session?.flow === c.flow;
-          return (
-            <button key={c.flow} disabled={!!busy} onClick={() => start(c.flow)} className={`card text-left p-5 transition hover:-translate-y-0.5 ${active ? "ring-2 ring-sage/60" : ""}`}>
-              <div className="flex items-start justify-between">
-                <span className="size-10 rounded-xl bg-mint/70 grid place-items-center" aria-hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#154539" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={c.icon} /></svg></span>
-                {active && <span className="tag bg-sagedeep text-white">Active now</span>}
-              </div>
-              <h2 className="mt-4 text-[1.4rem]">{busy === c.flow ? "Starting…" : c.title}</h2>
-              <p className="mt-1 text-[14.5px] text-ink2">{c.body}</p>
-              <p className="mt-3 text-[13px] font-medium text-slate">{c.tag}</p>
-            </button>
-          );
-        })}
+      <section aria-label="How anxious are you right now">
+        <h2>How anxious are you right now?</h2>
+        <div className="mt-2.5 flex flex-wrap gap-2">{MOODS.map(([l], i) => <button key={l} className="chip" aria-pressed={mood === i} onClick={() => logMood(i)}>{l}</button>)}</div>
+        {mood != null && <p className="mt-2.5 text-[14px] text-ink2">{mood >= 3 ? <>Thanks for telling me. <Link className="underline text-ink" href="/now?sos=1">Want to start something together?</Link></> : "Thanks. Noted."}</p>}
       </section>
-      {err && <p role="alert" className="text-terra">{err}</p>}
 
-      {session ? (
-        scripted
-          ? <Guide key={session.id} sessionId={session.id} onExit={exit} />
-          : <Companion key={session.id} sessionId={session.id} mode={session.flow} onExit={exit} onFallback={() => setScripted(true)} />
-      ) : (
-        <section className="grid md:grid-cols-[1.3fr_1fr] gap-6 items-stretch">
-          <article className="card p-7 flex flex-col justify-between gap-6" style={{ background: "linear-gradient(140deg, #fff 0%, rgba(188,237,220,.35) 100%)" }}>
-            <div>
-              <p className="eyebrow">Someone to talk to</p>
-              <h2 className="mt-1 text-[1.9rem]">Juno stays on the line with you.</h2>
-              <p className="mt-3 text-ink2 prose-narrow">A real conversation, in a calm voice. In a hard moment, Juno tells you exactly what to do, one step at a time. When it eases, you can just talk. Juno remembers what helps you, and looks up techniques on trusted health sites for what you're facing.</p>
-            </div>
-            <div className="flex flex-wrap gap-3"><button onClick={() => start("panic")} disabled={!!busy} className="b b-primary">I'm panicking right now</button><button onClick={() => start("talk")} disabled={!!busy} className="b b-ghost">Just talk to me</button></div>
-          </article>
-          <div className="grid gap-4">
-            {conds.includes("ocd") && <a href="/tracker" className="card p-5 hover:-translate-y-0.5 transition"><p className="eyebrow">For OCD</p><h3 className="mt-1 text-[1.35rem]">Urge tracker</h3><p className="text-[14.5px] text-ink2">Log urges and whether you delayed or resisted. See your progress over time.</p></a>}
-            <a href="/diary" className="card p-5 hover:-translate-y-0.5 transition"><p className="eyebrow">Want to talk it out?</p><h3 className="mt-1 text-[1.35rem]">Voice Diary</h3><p className="text-[14.5px] text-ink2">Say everything on your mind. I'll listen without judging.</p></a>
-            <a href="/care" className="card p-5 hover:-translate-y-0.5 transition"><p className="eyebrow">When you're ready</p><h3 className="mt-1 text-[1.35rem]">Find care near you</h3><p className="text-[14.5px] text-ink2">Therapists and groups by location and insurance, with sources.</p></a>
+      {signal && (
+        <section className="card p-5" style={{ background: "var(--terra-soft)" }}>
+          <h2>Something I noticed</h2>
+          <p className="mt-1 text-[14.5px]">{signal.text} It might help to bring this to someone who can support you.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {signal.action === "crisis" ? <a href="tel:988" className="b b-terra">Call or text 988</a> : <button onClick={copyNote} className="b b-primary">{copied ? "Copied. Paste it to your therapist." : "Copy a note to my therapist"}</button>}
+            <Link href="/care" className="b b-soft">Find someone to talk to</Link>
+            <Link href="/crisis" className="b b-ghost">Crisis support</Link>
           </div>
         </section>
       )}
-      {session && !scripted && <p className="text-[13px] text-ink2">Prefer simple spoken steps without a live conversation? <button className="underline" onClick={() => setScripted(true)}>Use guided steps instead</button></p>}
+
+      <section>
+        <h2>Today</h2>
+        <div className="mt-1">
+          {plan?.next_at && <Link href="/therapy" className="link-row"><span><span className="block font-medium text-[14.5px]">Therapy {day(plan.next_at)}, {time(plan.next_at)}</span><span className="block text-[13px] text-ink2">{plan.therapist_name ?? "Your therapist"}{open.length ? ` · ${open.length} homework item${open.length > 1 ? "s" : ""} open` : " · homework done"}</span></span><span className="text-ink2">→</span></Link>}
+          {!plan && th && <Link href="/therapy" className="link-row"><span><span className="block font-medium text-[14.5px]">Keep up with your therapy</span><span className="block text-[13px] text-ink2">Add your appointments and homework</span></span><span className="text-ink2">→</span></Link>}
+          {th?.adherence?.lastMissed && <Link href="/therapy" className="link-row"><span><span className="block font-medium text-[14.5px]">You missed your last session</span><span className="block text-[13px] text-ink2">Rescheduling soon can help you stay on track</span></span><span className="text-ink2">→</span></Link>}
+          {due && <Link href="/now?mode=talk" className="link-row"><span><span className="block font-medium text-[14.5px]">You asked me to check in</span><span className="block text-[13px] text-ink2">A minute, whenever you're ready</span></span><span className="text-ink2">→</span></Link>}
+          <Link href="/tracker" className="link-row"><span><span className="block font-medium text-[14.5px]">{conds.includes("ocd") ? "Log an urge" : conds.includes("panic") ? "Log a panic episode" : "How does today feel?"}</span><span className="block text-[13px] text-ink2">Under a minute</span></span><span className="text-ink2">→</span></Link>
+          {dy?.entries?.[0] && <Link href="/diary" className="link-row"><span><span className="block font-medium text-[14.5px]">Last diary entry: {dy.entries[0].title}</span><span className="block text-[13px] text-ink2">{Math.max(0, Math.round((Date.now() - new Date(dy.entries[0].created_at).getTime()) / 864e5))} days ago</span></span><span className="text-ink2">→</span></Link>}
+        </div>
+      </section>
+
+      {tr && tr.logs.length > 0 && (
+        <section className="only-balanced">
+          <h2>This week</h2>
+          <p className="mt-1.5 text-[15px] text-ink2">{weekLine(tr.kind, tr.logs)}</p>
+          {dy?.progress === "improving" && <p className="mt-1 text-[14px] text-sage">Your recent diary entries have felt a bit lighter than the ones before.</p>}
+        </section>
+      )}
     </div>
   );
 }
-export default function Page() { return <Suspense><Home /></Suspense>; }

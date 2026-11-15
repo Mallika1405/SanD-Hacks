@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { q } from "@/lib/db";
-import { ensureDevice } from "@/lib/device";
+import { ensureDevice, setEntered } from "@/lib/device";
 import { hashPassword, normHandle, validHandle } from "@/lib/auth";
 
 const Body = z.object({ handle: z.string().max(40), password: z.string().min(8).max(100), displayName: z.string().max(40).optional() });
@@ -20,5 +20,6 @@ export async function POST(req: Request) {
     await q("INSERT INTO accounts(handle, password_hash, salt, device_id) VALUES ($1,$2,$3,$4)", [handle, hash, salt, device]);
   } catch { return NextResponse.json({ error: "That username is taken." }, { status: 409 }); }
   if (p.data.displayName) await q("INSERT INTO profiles(device_id, display_name) VALUES ($1,$2) ON CONFLICT (device_id) DO UPDATE SET display_name=$2", [device, p.data.displayName.trim()]);
+  await setEntered("account");
   return NextResponse.json({ ok: true, handle });
 }
