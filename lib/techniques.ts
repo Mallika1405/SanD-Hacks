@@ -36,9 +36,9 @@ function clean(t: Raw) {
   return { title: String(t.title).slice(0, 80), duration_s: Math.round(Number(t.duration_s) || steps.reduce((a, s) => a + s.pause_ms / 1000 + 3, 0)), steps, quote: t.quote ? String(t.quote).slice(0, 160) : null };
 }
 
-async function setStatus(sessionId: string, status: string) { await q("UPDATE sessions SET research=$2 WHERE id=$1", [sessionId, status]).catch(() => {}); }
+async function setStatus(sessionId: string | null, status: string) { if (!sessionId) return; await q("UPDATE sessions SET research=$2 WHERE id=$1", [sessionId, status]).catch(() => {}); }
 
-export async function researchTechniques(key: string, flow: string, sit: string, sessionId: string): Promise<void> {
+export async function researchTechniques(key: string, flow: string, sit: string, sessionId: string | null): Promise<void> {
   try {
     if (!brightEnabled()) return void (await setStatus(sessionId, "unavailable"));
     const [fresh] = await q<{ n: number }>("SELECT count(*)::int n FROM techniques WHERE situation_key=$1 AND checked_at > now() - interval '24 hours'", [key]);
@@ -82,7 +82,7 @@ export type Sourced = Exercise & { source_url: string; source_name: string; db_i
 export async function listSourced(key: string): Promise<Sourced[]> {
   const rows = await q<any>("SELECT * FROM techniques WHERE situation_key=$1 ORDER BY checked_at DESC LIMIT 8", [key]);
   return rows.map((r) => ({
-    id: `src:${r.id}`, db_id: r.id, title: r.title, flows: [r.flow], status: "needs human review" as const, source_url: r.source_url, source_name: r.source_name,
+    id: `src:${r.id}`, db_id: r.id, title: r.title, blurb: `From ${r.source_name}`, flows: [r.flow], status: "needs human review" as const, source_url: r.source_url, source_name: r.source_name,
     segments: [{ text: "Do exactly what I say, one step at a time.", pause_ms: 1500 }, ...(r.steps as any[])].map((s) => ({ text: s.text, pause_ms: s.pause_ms, ...(s.listen ? { listen: true } : {}) })),
   }));
 }

@@ -7,3 +7,7 @@ export const PRESETS = [
 ];
 export const DEFAULT_VOICE = PRESETS[0].id;
 export const SAMPLE_LINE = "Let's slow down together. Breathe in gently, and let it out. You're doing fine.";
+
+// More expressive than Flash, still fast. Natural pace (speed 1.0), some style so it sounds like a person, not a reader.
+export const TTS_MODEL = "eleven_turbo_v2_5";
+export const TTS_SETTINGS = { stability: 0.42, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true, speed: 1.0 };

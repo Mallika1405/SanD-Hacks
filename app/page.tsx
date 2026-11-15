@@ -2,81 +2,78 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const FLOWS = [
-  { id: "panic", label: "Panic" },
-  { id: "intrusive", label: "Intrusive thoughts" },
-  { id: "overwhelm", label: "Overwhelmed" },
-] as const;
+const OPTIONS = [
+  { flow: "intrusive", title: "Racing thoughts", sub: "A thought won't let go" },
+  { flow: "overwhelm", title: "Overwhelmed", sub: "It's all too much" },
+  { flow: "talk", title: "Just talk to me", sub: "Say what's on your mind" },
+  { href: "/breathe", title: "Breathe with me", sub: "No voice, just a pacer" },
+];
 
 export default function Home() {
   const r = useRouter();
-  const [flow, setFlow] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [due, setDue] = useState<{ id: string } | null>(null);
-  useEffect(() => { fetch("/api/checkins/due").then((r) => r.json()).then((j) => setDue(j.due)).catch(() => {}); }, []);
 
-  async function startCheckin() {
-    setBusy(true);
-    try {
-      const res = await fetch("/api/sos/start", { method: "POST", body: JSON.stringify({ flow: "checkin", checkinId: due!.id }) });
-      const s = await res.json(); r.push(`/session?id=${s.id}`);
-    } catch { setErr("I couldn't start. Please try again."); setBusy(false); }
-  }
+  useEffect(() => {
+    fetch("/api/checkins/due").then((x) => x.json()).then((j) => setDue(j.due)).catch(() => {});
+    fetch("/api/research/warm").catch(() => {}); // pre-fetch trusted-source techniques so they're ready when needed (sends no personal data)
+  }, []);
 
-  async function start() {
-    setBusy(true); setErr("");
+  async function start(flow: string, checkinId?: string) {
+    setBusy(flow); setErr("");
     try {
-      const res = await fetch("/api/sos/start", { method: "POST", body: JSON.stringify({ flow: flow ?? "unsure" }) });
+      const res = await fetch("/api/sos/start", { method: "POST", body: JSON.stringify({ flow, checkinId }) });
       if (!res.ok) throw new Error();
-      const s = await res.json();
-      r.push(`/session?id=${s.id}`);
-    } catch { setErr("I couldn't start. Please try again."); setBusy(false); }
+      r.push(`/session?id=${(await res.json()).id}`);
+    } catch { setErr("I couldn't start. Please try again."); setBusy(""); }
   }
 
   return (
-    <main className="p-6 pb-10 flex flex-col min-h-dvh">
-      <header className="flex items-center justify-between pt-1">
-        <h1 className="text-2xl font-semibold tracking-tight">somewhere.</h1>
-        <nav className="flex gap-1 text-sm">
-          <a href="/voice" className="px-3 min-h-12 inline-flex items-center rounded-full bg-surface text-ink">Voice</a>
-          <a href="/care" className="px-3 min-h-12 inline-flex items-center text-muted">Support</a>
-          <a href="/me" className="px-3 min-h-12 inline-flex items-center text-muted">You</a>
+    <main className="px-5 pt-5 pb-8 flex flex-col min-h-dvh fade-in">
+      <header className="flex items-center justify-between">
+        <span className="text-xl font-semibold tracking-tight">somewhere<span className="text-teal">.</span></span>
+        <nav className="flex gap-1 text-[15px]">
+          <a href="/voice" className="px-3 min-h-11 inline-flex items-center rounded-full text-muted hover:text-ink">Voice</a>
+          <a href="/me" className="px-3 min-h-11 inline-flex items-center rounded-full text-muted hover:text-ink">You</a>
         </nav>
       </header>
 
+      <section className="flex-1 flex flex-col items-center justify-center text-center gap-5 py-6">
+        <div className="orb-wrap sm" aria-hidden><i className="ring r3" /><i className="ring r2" /><i className="ring" /><div className="orb" /></div>
+        <div className="space-y-2 max-w-[22rem]">
+          <h1 className="text-[2rem] leading-tight font-semibold tracking-tight">Take a breath.<br />I'm here with you.</h1>
+          <p className="text-muted text-lg leading-snug">You don't have to explain anything. Tap the button, and I'll talk you through it.</p>
+        </div>
+      </section>
+
       {due && (
-        <section aria-label="Check-in" className="mt-4 bg-surface rounded-2xl p-4 flex items-center justify-between gap-3">
-          <div><p className="font-medium">You asked me to check in.</p><p className="text-sm text-muted">Takes about a minute. Skip it any time.</p></div>
-          <button disabled={busy} onClick={startCheckin} className="px-4 min-h-12 rounded-xl bg-accent text-ground font-semibold disabled:opacity-50">Talk</button>
-        </section>
+        <button disabled={!!busy} onClick={() => start("checkin", due.id)} className="mb-3 bg-surface rounded-2xl p-4 flex items-center justify-between text-left">
+          <span><span className="block font-medium">You asked me to check in.</span><span className="text-sm text-muted">A minute, whenever you're ready.</span></span>
+          <span className="text-teal font-medium pl-3">Talk →</span>
+        </button>
       )}
 
-      <section className="flex-1 flex flex-col justify-center gap-6 py-8">
-        <div className="orb paused" aria-hidden />
-        <div className="text-center space-y-2">
-          <p className="text-3xl font-semibold leading-tight">I'm here with you.</p>
-          <p className="text-muted text-lg leading-snug">You don't have to explain anything. Start whenever you're ready.</p>
-        </div>
-      </section>
+      <button disabled={!!busy} onClick={() => start("panic")} className="btn-primary w-full min-h-[76px] rounded-[26px] text-[1.35rem] font-semibold disabled:opacity-60">
+        {busy === "panic" ? "Starting…" : "I'm panicking right now"}
+      </button>
+      {err && <p role="alert" className="text-coral text-center mt-2">{err}</p>}
 
-      <section className="space-y-4">
-        <div role="group" aria-label="What is it like right now (optional)" className="flex flex-wrap justify-center gap-2">
-          {FLOWS.map((f) => (
-            <button key={f.id} aria-pressed={flow === f.id} onClick={() => setFlow(flow === f.id ? null : f.id)}
-              className={`px-4 rounded-full text-base ${flow === f.id ? "bg-accent text-ground font-semibold" : "bg-surface text-ink"}`}>
-              {flow === f.id ? "✓ " : ""}{f.label}
-            </button>
-          ))}
-        </div>
-        <button disabled={busy} onClick={start} className="w-full min-h-20 rounded-3xl bg-accent text-ground text-xl font-bold disabled:opacity-50">
-          {busy ? "Starting…" : "Start SOS session"}
-        </button>
-        {err && <p role="alert" className="text-coral text-center">{err}</p>}
-        <p className="text-xs text-muted text-center pt-2">
-          Somewhere is a demo and not a medical service or crisis line. If you might hurt yourself or this is a medical emergency, call or text 988, or call 911.
-        </p>
-      </section>
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        {OPTIONS.map((o: any) => {
+          const body = (<><span className="block text-[1.05rem] font-medium leading-snug">{o.title}</span><span className="block text-sm text-muted mt-0.5">{o.sub}</span></>);
+          return o.href
+            ? <a key={o.title} href={o.href} className="bg-surface rounded-2xl p-4 text-left">{body}</a>
+            : <button key={o.title} disabled={!!busy} onClick={() => start(o.flow)} className="bg-surface rounded-2xl p-4 text-left disabled:opacity-60">{busy === o.flow ? "Starting…" : body}</button>;
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <a href="/care" className="bg-surface rounded-2xl p-4"><span className="block font-medium">Find support</span><span className="block text-sm text-muted">Therapists and groups</span></a>
+        <a href="tel:988" className="btn-help rounded-2xl p-4 text-left"><span className="block font-medium">Need a person now?</span><span className="block text-sm opacity-80">Call or text 988</span></a>
+      </div>
+
+      <p className="text-xs text-muted text-center pt-6 leading-relaxed">Somewhere is a demo and not a medical service or crisis line. If this is a medical emergency, call 911.</p>
     </main>
   );
 }

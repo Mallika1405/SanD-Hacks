@@ -1,7 +1,7 @@
 import { q } from "./db";
 import { gemini } from "./gemini";
 import { assessSafety, CRISIS_SEGS, MEDICAL_SEGS, SAFETY_QUESTION } from "./safety";
-import { BY_FLOW, Flow as ExerciseFlow, getExercise } from "./exercises";
+import { BY_FLOW, EXERCISES, Flow as ExerciseFlow, getExercise } from "./exercises";
 import { out, OutSeg, Seg } from "./speech";
 import { listSourced, slug } from "./techniques";
 
@@ -11,7 +11,7 @@ import { listSourced, slug } from "./techniques";
  * ("slower", "something else", "stop") but never has to. The only question it ever asks is a safety question, and only
  * when she herself mentions a symptom that could be an emergency. See docs/EVIDENCE.md.
  */
-type Flow = ExerciseFlow | "checkin";
+type Flow = ExerciseFlow | "checkin" | "talk";
 export type State = "start" | "support" | "adapt" | "finish" | "followup" | "crisis";
 type Pending = "safety" | "finish_choice" | "checkin" | "checkin_reply";
 type Ctx = {
@@ -20,10 +20,11 @@ type Ctx = {
   resumeIdx?: number; recent: { r: "u" | "a"; t: string }[]; turns: number;
 };
 export type TurnInput = {
-  event?: "start" | "segments_done" | "okay_now" | "resume" | "help_now" | "safe_now"; text?: string; spoken_idx?: number; interrupted?: boolean;
+  event?: "start" | "segments_done" | "okay_now" | "resume" | "help_now" | "safe_now" | "choose"; exId?: string; text?: string; spoken_idx?: number; interrupted?: boolean;
 };
 export type TurnOut = {
   say: OutSeg[]; lead: number; exBase: number; state: State; flow: Flow; exerciseId?: string; exerciseTitle?: string; research?: { key: string; flow: string; sit: string };
+  catalog: { id: string; title: string; blurb: string; source?: string }[]; transitions: OutSeg[]; progress: { block: number; max: number };
   ui: { crisis?: "self_harm" | "medical"; finish?: boolean; followup?: boolean; trusted?: boolean; checkinConsent?: boolean; suggestCare?: boolean; done?: boolean; rate?: boolean; source?: { name: string; url: string; title: string } };
 };
 
@@ -31,7 +32,7 @@ const MAX_BLOCKS = 8; // about 12 to 15 minutes of guidance, then a closing
 const norm = (t: string) => t.toLowerCase().replace(/[’]/g, "'").replace(/[^a-z0-9' ]/g, " ").replace(/\s+/g, " ").trim();
 const S = (text: string, pause_ms = 800, listen = false): Seg => ({ text, pause_ms, ...(listen ? { listen } : {}) });
 const TRANSITIONS = ["Good. Stay with me.", "Well done. Next step.", "Keep going. You're doing this.", "Good. Let's keep moving.", "That's it. Next."];
-const FLOW_LABEL: Record<string, string> = { panic: "panic attack", overwhelm: "feeling overwhelmed" };
+const FLOW_LABEL: Record<string, string> = { panic: "panic attack", overwhelm: "feeling overwhelmed", talk: "anxiety" };
 
 type Intent = "worse" | "different" | "slower" | "stop" | "helped" | "pause" | "trusted" | "yes" | "no" | "talk";
 export function intent(text: string): Intent {
@@ -72,6 +73,28 @@ async function situationOf(text: string): Promise<string | null> {
   return g?.situation?.trim().toLowerCase().slice(0, 60) || null;
 }
 
+/** Conversational reply for "just talk to me" mode. Warm, human, short. May include a gentle invitation, never a diagnosis or a promise. */
+async function talkReply(text: string, recent: Ctx["recent"]): Promise<string> {
+  const hist = recent.slice(-6).map((m) => `${m.r === "u" ? "Person" : "You"}: ${m.t}`).join("\n");
+  const g = await gemini<{ say: string }>(`${hist}\nPerson: ${text.slice(0, 500)}`, true, {
+    system: `You are a warm, steady friend with the skills of a good therapist, talking out loud to someone who is anxious. Sound like a real person: contractions, plain words, no lists, no jargon. Reply in 2 to 3 short sentences. Respond to the specific thing they said. You may end with one gentle invitation such as "If you want, we can breathe together." Never diagnose. Never promise they will be okay. Never say "calm down" or "don't worry". Reply JSON {"say":"..."}`,
+    timeoutMs: 5000 });
+  const say = g?.say?.trim();
+  if (!say || BANNED.test(say) || say.split(/\s+/).length > 60) return "I hear you. I'm right here with you. Tell me more, or we can just breathe for a minute.";
+  return say;
+}
+
+/** Researched steps come from web pages: have Gemini say them like a person. Same steps, same count, same meaning. Falls back to the originals. */
+async function humanize(segs: Seg[], sit: string | undefined): Promise<Seg[]> {
+  const g = await gemini<{ lines: string[] }>(
+    `Rewrite each line so a calm, warm person would say it out loud to someone who is anxious${sit ? ` (${sit})` : ""}. Keep the exact same instruction and the same number of lines. Short, spoken, contractions. No questions. No promises. No "relax" or "calm down". Lines:\n${JSON.stringify(segs.map((x) => x.text))}\nReply JSON {"lines":[...]}`,
+    true, { timeoutMs: 6000 });
+  const lines = g?.lines;
+  if (!Array.isArray(lines) || lines.length !== segs.length) return segs;
+  if (lines.some((l) => typeof l !== "string" || !l.trim() || l.length > 150 || l.includes("?") || BANNED.test(l))) return segs;
+  return segs.map((x, i) => ({ ...x, text: lines[i].trim() }));
+}
+
 const ACKS = ["Good.", "That's it.", "Nicely done.", "Stay with that."];
 
 export async function turn(sessionId: string, deviceId: string, input: TurnInput): Promise<TurnOut> {
@@ -106,9 +129,11 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   const text = input.text?.trim() || "";
   if (text) { ctx.recent.push({ r: "u", t: text.slice(0, 300) }); ctx.turns++; }
 
+  let forced: string | undefined;
   const seqFlow = (): Exclude<ExerciseFlow, "unsure"> => (flow === "overwhelm" ? "overwhelm" : flow === "intrusive" ? "intrusive" : "panic");
   /** Next block in the arc. Researched techniques are woven in after the first two reviewed ones. */
   const pick = () => {
+    if (forced) return forced;
     const seq = BY_FLOW[seqFlow()], srcIds = sourced.map((e) => e.id);
     const unseen = (ids: string[]) => ids.filter((id) => !ctx.tried.includes(id) && !ctx.worse.includes(id));
     const wantSourced = ctx.tried.length >= 2 && ctx.tried.length % 2 === 0;
@@ -125,7 +150,7 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   const replayFrom = (idx: number, leadSegs: Seg[] = []) => {
     const ex = getEx(ctx.exId!); ctx.pending = undefined; ctx.resumeIdx = undefined; state = "support";
     const rest = ex.segments.slice(Math.max(0, idx));
-    if (!rest.length) { ctx.blocks = (ctx.blocks ?? 0) + 1; begin([...leadSegs, S(TRANSITIONS[(ctx.blocks ?? 0) % TRANSITIONS.length], 600)]); return; }
+    if (!rest.length) { ctx.blocks = (ctx.blocks ?? 0) + 1; begin(leadSegs); return; }
     say = [...leadSegs, ...rest]; lead = leadSegs.length; exBase = Math.max(0, idx);
   };
   const crisis = (kind: "self_harm" | "medical") => {
@@ -186,6 +211,12 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
       const line = g?.say && !BANNED.test(g.say) && g.say.split(/\s+/).length <= 30 ? g.say.trim() : "Hi. It's Somewhere, checking in like you asked.";
       ctx.pending = "checkin_reply"; state = "start";
       say = [S(line, 600), S("How are you doing right now?", 400, true)];
+    } else if (input.event === "choose") {
+      const id = input.exId ?? "";
+      if (EXERCISES.some((e) => e.id === id) || exMap.has(id)) { forced = id; ctx.worse = ctx.worse.filter((x) => x !== id); begin([S("Okay. Let's do this one.", 400)]); }
+    } else if (input.event === "start" && flow === "talk") {
+      ctx.pending = undefined; state = "start";
+      say = [S("Hey. I'm right here.", 500), S("Tell me what's going on. Or if you'd rather not talk, just stay with me and we'll breathe.", 400, true)];
     } else if (input.event === "start") {
       // Straight into guidance. No greeting, no questions: the first block opens with "I'm here. Do exactly what I say."
       startResearch(FLOW_LABEL[flow] ?? "anxiety attack");
@@ -197,12 +228,23 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
       if (state === "support") {
         ctx.blocks = (ctx.blocks ?? 0) + 1;
         if (ctx.blocks >= MAX_BLOCKS) await finish();
-        else begin([S(TRANSITIONS[ctx.blocks % TRANSITIONS.length], 600)]);
+        else begin();
       }
     } else if (text) {
       const i = intent(text);
       const resumeAt = (input.spoken_idx ?? -1) + (input.interrupted ? 0 : 1);
-      if (ctx.pending === "checkin_reply") {
+      if (flow === "talk" && ctx.pending !== "finish_choice" && i !== "stop") {
+        const f = detectFlow(text);
+        const wantsGuide = /(breathe|breathing|guide me|help me calm|help me through|walk me through|exercise)/.test(norm(text)) || i === "yes";
+        if (wantsGuide || ((f === "panic" || f === "overwhelm") && /(panic|attack|can't breathe|racing|spiral|freaking|losing it|overwhelm)/.test(norm(text)))) {
+          flow = f === "overwhelm" ? "overwhelm" : "panic"; startResearch(FLOW_LABEL[flow] ?? "anxiety");
+          begin([S("Okay. Let's slow this down together.", 500)]);
+        } else {
+          const reply = await talkReply(text, ctx.recent); ctx.recent.push({ r: "a", t: reply });
+          const sit = await situationOf(text); if (sit && f !== "intrusive") { flow = "talk"; startResearch(sit); }
+          say = [S(reply, 600, true)]; state = "start";
+        }
+      } else if (ctx.pending === "checkin_reply") {
         const n = norm(text);
         const neg = /(not good|not great|not okay|not ok|bad|anxious|rough|hard|worse|tough|stress|panic|scared|overwhelm|struggl|tired|awful|terrible|can't|cant)/.test(n);
         const pos = /\b(good|fine|okay|ok|better|great|well|alright|calm)\b/.test(n);
@@ -246,6 +288,11 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   if (say.length && say[0]) ctx.recent.push({ r: "a", t: say.map((s) => s.text).join(" ").slice(0, 200) });
   ctx.recent = ctx.recent.slice(-6);
   if (ended || ui.done) ctx.recent = [];
+  // Researched blocks are machine-extracted: have Gemini say them like a person (never the reviewed ones, which are already written to be spoken).
+  if (ctx.exId?.startsWith("src:") && !ui.crisis && say.length > Math.max(lead, 0)) {
+    const l0 = Math.max(lead, 0);
+    say = [...say.slice(0, l0), ...(await humanize(say.slice(l0), ctx.sit))];
+  }
   const ex = ctx.exId ? getEx(ctx.exId) : null;
   if (ex?.source_url) ui.source = { name: ex.source_name, url: ex.source_url, title: ex.title };
   await q(
@@ -254,5 +301,13 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
     [sessionId, state, JSON.stringify(ctx), flow, ctx.helped, ended, `${flow}; tried ${ctx.tried.join(", ") || "none"}; helped ${ctx.helped.join(", ") || "none"}`]);
 
   if (lead < 0) lead = say.length;
-  return { say: out(say, ctx.slow), lead, exBase, state, flow: flow as any, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui, research };
+  const sf = seqFlow();
+  const catalog = [
+    ...EXERCISES.filter((e) => e.flows.includes(sf) || e.id === "exhale-breath").map((e) => ({ id: e.id, title: e.title, blurb: e.blurb })),
+    ...sourced.map((e) => ({ id: e.id, title: e.title, blurb: `From ${e.source_name}`, source: e.source_name })),
+  ];
+  return {
+    say: out(say, ctx.slow), lead, exBase, state, flow: flow as any, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui, research,
+    catalog, transitions: out(TRANSITIONS.map((t) => S(t, 0))), progress: { block: ctx.blocks ?? 0, max: MAX_BLOCKS },
+  };
 }

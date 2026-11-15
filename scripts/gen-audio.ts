@@ -5,12 +5,13 @@ import path from "path";
 import { EXERCISES } from "../lib/exercises";
 import { CRISIS_SEGS, MEDICAL_SEGS, SAFETY_QUESTION } from "../lib/safety";
 import { fbKey } from "../lib/speech";
-import { DEFAULT_VOICE } from "../lib/voices";
+import { DEFAULT_VOICE, TTS_MODEL, TTS_SETTINGS } from "../lib/voices";
 
 // Pre-generates fallback audio (default preset voice) so the demo works if the live voice path fails.
 const CORE = ["orient-posture", "exhale-breath", "name-it", "ground-54321", "intr-notice"];
 const texts = new Set<string>([
   "Good. Stay with me.", "Well done. Next step.", "Keep going. You're doing this.", "Good. Let's keep moving.", "That's it. Next.",
+  "Okay. Let's do this one.", "Hey. I'm right here.", "Tell me what's going on. Or if you'd rather not talk, just stay with me and we'll breathe.", "Okay. Let's slow this down together.",
   "Okay. Slower.", "Okay. Let's change it. Follow my voice.", "Good. Stay with it.", "Okay. Let's continue. Follow my voice.",
   "I'm glad you're safe right now. Stay with me. We'll go slowly.",
   "You've done well. Stay here a little longer.", "Keep your feet on the floor, and keep your breathing slow.", "When you're ready, drink some water.",
@@ -28,7 +29,7 @@ const texts = new Set<string>([
     await Promise.all(todo.slice(i, i + 4).map(async (t) => {
       const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${DEFAULT_VOICE}?output_format=mp3_44100_64`, {
         method: "POST", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY!, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: t, model_id: "eleven_flash_v2_5", voice_settings: { stability: 0.7, similarity_boost: 0.75, style: 0, speed: 0.88 } }),
+        body: JSON.stringify({ text: t, model_id: TTS_MODEL, voice_settings: TTS_SETTINGS }),
       });
       if (!r.ok) { console.error("failed:", r.status, t.slice(0, 40)); return; }
       const k = fbKey(t); fs.writeFileSync(path.join(dir, `${k}.mp3`), Buffer.from(await r.arrayBuffer())); manifest[k] = `/audio/${k}.mp3`;

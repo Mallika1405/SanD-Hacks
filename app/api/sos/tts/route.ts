@@ -1,6 +1,6 @@
 import { currentDevice } from "@/lib/device";
 import { q } from "@/lib/db";
-import { PRESETS } from "@/lib/voices";
+import { PRESETS, TTS_MODEL, TTS_SETTINGS } from "@/lib/voices";
 import { sign, verify } from "@/lib/speech";
 
 const cache = new Map<string, Buffer>();
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   const up = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${v}/stream?output_format=mp3_44100_64`, {
     method: "POST",
     headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ text, model_id: "eleven_flash_v2_5", voice_settings: { stability: 0.7, similarity_boost: 0.75, style: 0, speed: 0.88 } }),
+    body: JSON.stringify({ text, model_id: TTS_MODEL, voice_settings: TTS_SETTINGS }),
     signal: AbortSignal.timeout(15000),
   }).catch(() => null);
   if (!up || !up.ok || !up.body) return new Response("tts failed", { status: 502 });

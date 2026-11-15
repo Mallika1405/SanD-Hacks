@@ -3,7 +3,7 @@ import { z } from "zod";
 import { q } from "@/lib/db";
 import { ensureDevice } from "@/lib/device";
 
-const Body = z.object({ flow: z.enum(["panic", "intrusive", "overwhelm", "unsure", "checkin"]).default("unsure"), checkinId: z.string().uuid().optional() });
+const Body = z.object({ flow: z.enum(["panic", "intrusive", "overwhelm", "unsure", "checkin", "talk"]).default("unsure"), checkinId: z.string().uuid().optional() });
 
 export async function POST(req: Request) {
   const p = Body.safeParse(await req.json().catch(() => ({})));
