@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { q } from "./db";
 import { recordIncident } from "./incidents";
 import { baseUrl, client, isEmergencyNumber, sendSms, twilioEnabled, VoiceResponse } from "./twilio";
+import { createVapiCall, vapiEnabled, vapiSayAndEnd } from "./vapi";
 
 export type Alert = {
   id: string; user_id: string; session_id: string | null; token: string; owner_secret: string;
@@ -9,7 +10,7 @@ export type Alert = {
   claimed_by: string | null; claimed_at: string | null; created_at: string; expires_at: string;
 };
 type Contact = { id: string; name: string; phone: string };
-type CallRow = { id: string; alert_id: string; contact_id: string; call_sid: string | null; status: string; attempt: number };
+type CallRow = { id: string; alert_id: string; contact_id: string; call_sid: string | null; status: string; attempt: number; control_url?: string | null; provider?: string | null };
 
 export async function logEvent(alertId: string | null, sessionId: string | null, kind: string, note?: string, data?: unknown) {
   await q("INSERT INTO events(alert_id, session_id, kind, note, data) VALUES ($1,$2,$3,$4,$5)", [
@@ -73,12 +74,22 @@ async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[])
       }
       if (attempt === 1)
         await sendSms(c.phone, `${name} asked for help${where}. Live link: ${responderLink(alert, c.id)} (Haven does not replace 911.)`).catch(() => {});
-      if (!twilioEnabled()) {
-        await q("UPDATE alert_calls SET status='dry_run', call_sid=$2, updated_at=now() WHERE id=$1", [row.id, "dry_" + row.id]);
-        return;
-      }
       if (isEmergencyNumber(c.phone)) {
         await q("UPDATE alert_calls SET status='blocked', updated_at=now() WHERE id=$1", [row.id]);
+        return;
+      }
+      if (vapiEnabled()) {
+        try {
+          const v = await createVapiCall({ to: c.phone, callRowId: row.id, contactName: c.name, briefing: await briefing(alert) });
+          await q("UPDATE alert_calls SET call_sid=$2, control_url=$3, provider='vapi', status='initiated', updated_at=now() WHERE id=$1", [row.id, v.id, v.controlUrl]);
+        } catch (e) {
+          await q("UPDATE alert_calls SET status='failed', provider='vapi', updated_at=now() WHERE id=$1", [row.id]);
+          console.error("vapi dial failed", e);
+        }
+        return;
+      }
+      if (!twilioEnabled()) {
+        await q("UPDATE alert_calls SET status='dry_run', call_sid=$2, updated_at=now() WHERE id=$1", [row.id, "dry_" + row.id]);
         return;
       }
       try {
@@ -149,7 +160,9 @@ async function notifyOthers(alert: Alert, winner: Contact) {
      WHERE ac.alert_id=$1 AND ac.contact_id<>$2 ORDER BY ac.contact_id, ac.attempt DESC`, [alert.id, winner.id]);
   await Promise.allSettled(
     calls.map(async (r) => {
-      if (twilioEnabled() && r.call_sid && !r.call_sid.startsWith("dry_")) {
+      if (r.provider === "vapi" && r.control_url && ["initiated", "ringing", "in-progress", "queued"].includes(r.status)) {
+        await vapiSayAndEnd(r.control_url, `${winner.name} is responding. You do not need to do anything else. Thank you.`).catch(() => {});
+      } else if (twilioEnabled() && r.call_sid && !r.call_sid.startsWith("dry_") && r.provider !== "vapi") {
         try {
           if (["queued", "initiated", "ringing"].includes(r.status))
             await client().calls(r.call_sid).update({ status: "canceled" });
@@ -181,6 +194,7 @@ export async function handleDigit(callId: string, digit: string) {
   await q("UPDATE alert_calls SET digit=$2, updated_at=now() WHERE id=$1", [callId, digit]);
   if (digit !== "1") return { done: false, message: "" };
   const r = await claimAlert(row.alert_id, row.contact_id);
+  if (!r.won && r.alert?.claimed_by === row.contact_id) return { done: true, message: "You are responding. We just texted you a live link. Stay safe." };
   if (r.won) return { done: true, message: "You are responding. We just texted you a live link. Stay safe." };
   if (r.claimerName) return { done: true, message: `${r.claimerName} is responding. You do not need to do anything else.` };
   return { done: true, message: "This alert is no longer active." };
