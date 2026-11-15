@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { q } from "./db";
 import { recordIncident } from "./incidents";
 import { baseUrl, client, isEmergencyNumber, sendSms, twilioEnabled, VoiceResponse } from "./twilio";
+import { speak } from "./tts";
 import { createVapiCall, vapiEnabled, vapiSayAndEnd } from "./vapi";
 
 export type Alert = {
@@ -147,9 +148,9 @@ export async function claimAlert(alertId: string, contactId: string) {
   return { won: false as const, alert: cur, claimerName: cur?.claimer_name ?? null };
 }
 
-function respondingTwiml(name: string) {
+async function respondingTwiml(name: string) {
   const vr = new VoiceResponse();
-  vr.say(`${name} is responding. You do not need to do anything else. Thank you.`);
+  await speak(vr, `${name} is responding. You do not need to do anything else. Thank you.`, baseUrl());
   vr.hangup();
   return vr.toString();
 }
@@ -167,7 +168,7 @@ async function notifyOthers(alert: Alert, winner: Contact) {
           if (["queued", "initiated", "ringing"].includes(r.status))
             await client().calls(r.call_sid).update({ status: "canceled" });
           else if (["in-progress", "answered"].includes(r.status))
-            await client().calls(r.call_sid).update({ twiml: respondingTwiml(winner.name) });
+            await client().calls(r.call_sid).update({ twiml: await respondingTwiml(winner.name) });
         } catch {}
       }
       await sendSms(r.phone, `${winner.name} is responding. No action needed. Details: ${responderLink(alert)}`).catch(() => {});

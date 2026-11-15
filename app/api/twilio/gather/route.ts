@@ -1,4 +1,5 @@
 import { handleDigit } from "@/lib/alerts";
+import { speak } from "@/lib/tts";
 import { baseUrl, formParams, verifyTwilio, twiml, VoiceResponse } from "@/lib/twilio";
 
 export async function POST(req: Request) {
@@ -8,7 +9,7 @@ export async function POST(req: Request) {
   const vr = new VoiceResponse();
   const r = await handleDigit(callId, params.Digits ?? "");
   if (r.done) {
-    vr.say(r.message);
+    await speak(vr, r.message, baseUrl());
     vr.hangup();
   } else {
     vr.redirect({ method: "POST" }, `${baseUrl()}/api/twilio/voice?callId=${callId}`);
