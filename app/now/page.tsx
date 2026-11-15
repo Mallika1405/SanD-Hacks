@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Guide from "@/components/Guide";
@@ -46,7 +47,7 @@ function Now() {
   return (
     <div className="space-y-6 fade-in">
       {!session && (
-        <section className="max-w-[560px]"><h1>What's going on right now?</h1><p className="mt-1.5 text-ink2">Pick the closest one and Juno will start talking with you. You don't have to explain anything.</p></section>
+        <section className="max-w-[560px]"><h1>What's going on right now?</h1><p className="mt-1.5 text-ink2">Pick the closest one and Juno will start talking with you. You don't have to explain anything. <Link href="/voice" className="underline">Change Juno's voice</Link></p></section>
       )}
       <section className="flex flex-wrap items-center gap-2" aria-label="Where are you, optional">
         <span className="text-[13.5px] text-ink2 mr-1">Where are you? (optional)</span>

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { personaFor } from "@/lib/personas";
 
 const MOODS: [string, number, number][] = [["Calm", 1, 5], ["A bit uneasy", 3, 4], ["Anxious", 5, 3], ["Very anxious", 7, 2], ["Panicking", 9, 1]];
 const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: "long" });
@@ -69,7 +70,7 @@ export default function Today() {
       <section className="pt-2">
         <h1>{hello}{name ? `, ${name}` : ""}.</h1>
         <p className="mt-1.5 text-ink2 text-[1.02rem]">
-          {!me ? " " : mood != null && mood >= 3 ? "That sounds like a lot right now. I'm here if you want company." : signal ? "I noticed something in your diary I'd like to check in about." : plan?.next_at ? `Your next session is ${day(plan.next_at)}, ${inDays(plan.next_at)}.` : "How's your head today?"}
+          {!me ? " " : mood != null && mood >= 3 ? "That sounds like a lot right now. I'm here if you want company." : signal ? "I noticed something in your diary I'd like to check in about." : plan?.next_at ? `Your next session is ${day(plan.next_at)}, ${inDays(plan.next_at)}.` : personaFor(conds).todayLine}
         </p>
       </section>
 

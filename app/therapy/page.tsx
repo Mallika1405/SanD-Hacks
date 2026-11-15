@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { personaFor } from "@/lib/personas";
 import Link from "next/link";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
@@ -11,6 +12,8 @@ const local = (iso?: string | null) => { if (!iso) return ""; const d = new Date
 export default function Therapy() {
   const [d, setD] = useState<any>(null);
   const [edit, setEdit] = useState(false);
+  const [note, setNote] = useState("");
+  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((m) => setNote(m.profile?.conditions?.length ? personaFor(m.profile.conditions).therapyNote : "")).catch(() => {}); }, []);
   const [form, setForm] = useState({ therapist_name: "", modality: "", frequency: "weekly", next: "" });
   const [hw, setHw] = useState("");
   const [prep, setPrep] = useState<any>(null);
@@ -50,7 +53,7 @@ export default function Therapy() {
 
   return (
     <div className="max-w-[680px] mx-auto space-y-8 fade-in">
-      <section><h1>Your therapy</h1><p className="mt-1.5 text-ink2">Keep your sessions and homework in one place, and walk in prepared. Nothing here is shared unless you copy it.</p></section>
+      <section><h1>Your therapy</h1><p className="mt-1.5 text-ink2">Keep your sessions and homework in one place, and walk in prepared. Nothing here is shared unless you copy it.</p>{note && <p className="mt-2 text-[14px] text-ink2 card-flat p-3">{note}</p>}</section>
 
       {!plan || edit ? (
         <section className="card p-5 space-y-3"><h2>{plan ? "Edit your plan" : "Set up your therapy"}</h2>{planForm}

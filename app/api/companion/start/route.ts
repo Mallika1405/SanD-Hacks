@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { currentDevice } from "@/lib/device";
 import { EXERCISES } from "@/lib/exercises";
+import { personaFor } from "@/lib/personas";
 
 const COND: Record<string, string> = { panic: "panic attacks", ocd: "OCD and intrusive thoughts", gad: "constant worry", social: "social anxiety", overwhelm: "stress and overwhelm", other: "anxiety" };
 
@@ -31,12 +32,13 @@ export async function GET(req: Request) {
   const themes = await q<{ t: string }>("SELECT t FROM diary_entries, unnest(themes) t WHERE device_id=$1 GROUP BY t ORDER BY count(*) DESC LIMIT 3", [device]);
   const fav = pr?.prefers?.favorite_exercise ? EXERCISES.find((e) => e.id === pr.prefers.favorite_exercise)?.title : "";
   const name = p?.display_name ?? "";
+  const persona = personaFor(p?.conditions);
   return NextResponse.json({
     signedUrl: signed_url, voiceId: pr?.companion_voice_id ?? pr?.voice_id ?? null,
     vars: {
       user_name: name || "friend", conditions: (p?.conditions ?? []).map((c: string) => COND[c] ?? c).join(", ") || "not shared",
       where: s.ctx?.where ?? "not shared", what_helped: fav || "not known yet", hard_times: pr?.prefers?.hard_times ?? "not shared",
-      diary_themes: themes.map((t) => t.t).join(", ") || "none yet", mode, opening_line: opening(mode, name),
+      diary_themes: themes.map((t) => t.t).join(", ") || "none yet", mode, conversation_style: persona.style, never_do: persona.avoid, opening_line: opening(mode, name),
     },
   });
 }

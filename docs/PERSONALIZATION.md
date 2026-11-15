@@ -1,0 +1,21 @@
+# How Somewhere adapts to each person, and the research behind it
+
+Somewhere adjusts its tone, questions, suggestions and layout to a person's conditions (`lib/personas.ts`, `lib/ui.ts`). Everything is a starting point the person can change. None of it is a diagnosis or medical advice.
+
+Sources below were found by searching PubMed (and Bright Data for layout research). We report what each one says and where the evidence is thin.
+
+| Design choice | What it rests on | Strength / caveat |
+|---|---|---|
+| Panic: explain the sensations, face them rather than avoid them, drop muscle relaxation from the moment-to-moment arc | Component network meta-analysis of CBT for panic: effective packages include face-to-face and interoceptive exposure and leave out muscle relaxation and VR exposure. Pompoli et al., Psychol Med 2018, doi:10.1017/S0033291717003919 | Meta-analysis of trials. It is about treatment packages, not about in-the-moment apps. |
+| Panic: nudge toward a clinician for the thinking side | Self-guided digital treatment reduces panic symptom severity; clinician involvement mattered more for cognition-related outcomes. J Anxiety Disord 2025, doi:10.1016/j.janxdis.2025.103074 | Meta-analysis; shows what guidance adds, not that this app works. |
+| Social anxiety: look outward, drop safety behaviours, notice replaying | Self-focused attention and safety behaviours predicted later symptom change in CBT for social anxiety. Anticipatory and post-event processing followed symptom change rather than predicting it. J Anxiety Disord 2019, doi:10.1016/j.janxdis.2019.102118 | Process study of therapy patients. Supports the focus on attention and safety behaviours more than on replaying. |
+| OCD: never reassure, mention ERP | A 2026 evaluation of AI answers on pediatric OCD found omission of exposure and response prevention was more common than factual error. Clin Child Psychol Psychiatry, doi:10.1177/13591045261499579. ERP is the core evidence-based therapy within CBT for OCD (JAMA Psychiatry 2025 meta-analyses, doi:10.1001/jamapsychiatry.2025.0482). | The first is a small exploratory study. The no-reassurance rule is standard ERP practice rather than something this search proved. |
+| Diary: guard against making people feel worse | In a randomized trial of expressive writing after a disaster, writing increased anxiety and sadness during the intervention and did not reduce post-traumatic stress; it may have worsened it for some. Psychol Med 2021, doi:10.1017/S003329172100074X | One trial in one population. We take the caution seriously: no pushing for painful detail, grounding and a check-in before closing. |
+| Therapy matters | CBT is probably effective for anxiety disorders, OCD and more, though effect sizes depend on the control condition. JAMA Psychiatry 2025, doi:10.1001/jamapsychiatry.2025.0482 | Large series of meta-analyses. |
+| Calming voices | **No good evidence found** on which voice or speaking rate calms people best. We offer calming-leaning choices and a suggested starting voice per condition, but ask people to choose what works for them. | Preference-based on purpose. |
+| Generalised worry and burnout wording | Searches returned nothing useful. These personas use standard CBT-informed practice (separating actionable from unactionable worry, shrinking tasks), not findings from this search. | Treat as reasonable practice, not proven. |
+
+## Honest limits
+- Search results were limited. We did not run a systematic review.
+- Nothing here has been tested in a trial of Somewhere itself.
+- Layout settings per condition come from public design guidance found with Bright Data and summarised by Gemini (`npm run ui:research`), not clinical trials.

@@ -56,7 +56,7 @@ export default function Login() {
 
           {demos && (
             <div className="pt-5 border-t border-line">
-              <p className="text-[13px] text-ink2 mb-2">Just looking around? Try a demo profile with sample history:</p>
+              <p className="text-[13px] text-ink2 mb-2">Just looking around? Try a demo profile with sample history, or <a className="underline" href="/demo">follow the guided demo</a>:</p>
               <div>{DEMOS.map((d) => <button key={d.handle} disabled={busy} onClick={() => demo(d.handle)} className="link-row w-full text-left"><span><span className="block font-medium text-[14.5px]">{d.name}</span><span className="block text-[13px] text-ink2">{d.blurb}</span></span><span className="text-ink2">→</span></button>)}</div>
             </div>
           )}

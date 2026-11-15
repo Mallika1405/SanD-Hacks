@@ -2,59 +2,44 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const STEPS: { say: string; expect: string }[] = [
-  { say: "Tap Start SOS session (Panic).", expect: "A calm voice begins slow breathing right away, no questions first. In the background, Bright Data starts researching calming techniques for it (see the green line on screen)." },
-  { say: "When the exercise ends, answer the 1 to 10 question, for example \"seven\".", expect: "A high number: it asks what's hardest, then researches that and switches to a technique found from a trusted source, shown with its link." },
-  { say: "Interrupt it mid-sentence: \"slower\".", expect: "It stops instantly, says \"Okay. Slower.\" and resumes from where it was, with longer pauses." },
-  { say: "Say \"something else\".", expect: "It switches to a different exercise." },
-  { say: "Say \"that made it worse\".", expect: "It thanks you, remembers not to repeat that exercise, and tries another." },
-  { say: "Say \"I feel dizzy\".", expect: "It pauses to ask one yes/no safety question instead of assuming anxiety." },
-  { say: "Say \"my chest hurts\".", expect: "Exercises stop. Big 911 and 988 buttons appear. It never calls anyone for you." },
-  { say: "Tap \"I'm safe right now\", then \"I'm okay now\".", expect: "It wraps up and offers: keep going, stop, or a message to someone you trust." },
-  { say: "Say \"stop\", then \"yes\" to a check-in.", expect: "Consent is saved. Come back here and press \"Make a check-in due now\"." },
+const STEPS: { n: number; title: string; as: string; name: string; to: string; do: string; see: string }[] = [
+  { n: 1, title: "Sign in and see it fit the person", as: "maya_ocd", name: "Maya", to: "/", do: "Look at Today. Maya has OCD, so the layout is calm and plain, the wording avoids reassurance, and her next therapy session is shown.", see: "A different person gets different words, spacing and colors." },
+  { n: 2, title: "Pick a calming voice", as: "maya_ocd", name: "Maya", to: "/voice", do: "Press Play on a few calming voices, then Use everywhere. Try Extra soothing. Use \"Suggested to start\" for the research-based pick.", see: "Different voices for Juno, guided exercises and the diary." },
+  { n: 3, title: "Panic, in the moment", as: "jordan_panic", name: "Jordan", to: "/now?sos=1", do: "Say \"I'm still panicking\" a couple of times.", see: "It explains what the body is doing, then moves to stronger, different actions (cold water, pushing a wall, counted breathing) instead of repeating itself." },
+  { n: 4, title: "Talk it through in the diary", as: "riley_social", name: "Riley", to: "/diary", do: "Choose Talk to me or Write instead and say how a social moment went.", see: "A real conversation. It asks one gentle question, avoids pushing painful detail, and keeps your actual words." },
+  { n: 5, title: "A diary that flags something serious", as: "sam_burnout", name: "Sam", to: "/", do: "Open Sam's Today and Diary.", see: "A heavy entry is flagged with 988, 911, a note to copy for their therapist, and a link to find care." },
+  { n: 6, title: "Keep up with therapy", as: "jordan_panic", name: "Jordan", to: "/therapy", do: "Jordan missed a session. Look at the plan, homework and what to bring.", see: "Next session, \"did you go?\", homework checklist and attendance dots." },
+  { n: 7, title: "Find a specific therapist", as: "sam_burnout", name: "Sam", to: "/care", do: "Keep \"A specific therapist\", set a city and insurance, and press Find options.", see: "Live results read from public pages, with names, credentials and sources, all marked unverified." },
+  { n: 8, title: "Light and dark", as: "alex_new", name: "Alex", to: "/you", do: "Open You. Switch Light or dark, and look at \"why it's set up this way\".", see: "Layout settings come from research per condition, and you can override them." },
 ];
 
 export default function Demo() {
   const r = useRouter();
-  const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState("");
-  async function start(flow: string) {
-    setBusy(flow);
-    const res = await fetch("/api/sos/start", { method: "POST", body: JSON.stringify({ flow }) });
-    const s = await res.json(); r.push(`/session?id=${s.id}`);
-  }
-  async function dueNow() {
-    const res = await fetch("/api/demo/checkin", { method: "POST" });
-    setMsg(res.ok ? "Done. Open Home to see the check-in card." : "That only works in local dev.");
+  const [busy, setBusy] = useState(0);
+  const [err, setErr] = useState("");
+  async function go(s: (typeof STEPS)[number]) {
+    setBusy(s.n); setErr("");
+    const res = await fetch("/api/auth/demo", { method: "POST", body: JSON.stringify({ handle: s.as }) });
+    if (!res.ok) { setBusy(0); setErr("Demo profiles only work on localhost. Run npm run seed first."); return; }
+    r.push(s.to); r.refresh();
   }
   return (
-    <main className="p-5 pb-12 space-y-6">
-      <a href="/" className="text-sm text-muted underline min-h-12 inline-flex items-center">← Home</a>
-      <h1 className="text-2xl font-semibold">Demo script</h1>
-      <p className="text-muted">A simulated anxiety episode. Use Chrome, allow the microphone, and speak naturally. Interrupt any time.</p>
-
-      <div className="grid grid-cols-1 gap-2">
-        {[["panic", "Start: Panic"], ["intrusive", "Start: Intrusive thoughts"], ["overwhelm", "Start: Overwhelmed"], ["unsure", "Start: not sure what it is"]].map(([f, l]) => (
-          <button key={f} disabled={!!busy} onClick={() => start(f)} className="min-h-14 rounded-2xl bg-accent text-ground font-semibold disabled:opacity-50">{busy === f ? "Starting…" : l}</button>
-        ))}
-      </div>
-
-      <ol className="space-y-2">
-        {STEPS.map((s, i) => (
-          <li key={i} className="bg-surface rounded-2xl p-4"><p className="font-medium">{i + 1}. {s.say}</p><p className="text-sm text-muted">{s.expect}</p></li>
+    <div className="max-w-[720px] mx-auto space-y-6 fade-in">
+      <section><h1>Demo walkthrough</h1><p className="mt-1.5 text-ink2">Eight stops, in order. Each button signs in as the right demo profile and opens the page. Run <code>npm run seed</code> once first.</p></section>
+      {err && <p role="alert" className="text-terra text-[14px]">{err}</p>}
+      <ol className="space-y-3">
+        {STEPS.map((s) => (
+          <li key={s.n} className="card p-4 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-[13px] text-ink2">Step {s.n}</p><p className="font-medium">{s.title}</p></div>
+              <button onClick={() => go(s)} disabled={busy === s.n} className="b b-primary shrink-0">{busy === s.n ? "Opening…" : `Open as ${s.name}`}</button>
+            </div>
+            <p className="text-[14.5px]"><b>Do:</b> {s.do}</p>
+            <p className="text-[14.5px] text-ink2"><b>You'll see:</b> {s.see}</p>
+          </li>
         ))}
       </ol>
-
-      <section className="bg-surface rounded-2xl p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Then</h2>
-        <button onClick={dueNow} className="w-full min-h-14 rounded-xl bg-ground">Make a check-in due now</button>
-        <a href="/" className="block min-h-12 leading-[48px] underline text-accent">See the check-in card on Home</a>
-        <a href="/care" className="block min-h-12 leading-[48px] underline text-accent">Find support (reads public pages live)</a>
-        <a href="/voice" className="block min-h-12 leading-[48px] underline text-accent">Voices and "a voice you trust"</a>
-        <a href="/between" className="block min-h-12 leading-[48px] underline text-accent">Between Moments (what I remember, Delete my data)</a>
-        {msg && <p role="status" className="text-teal text-sm">{msg}</p>}
-      </section>
-      <p className="text-xs text-muted">Somewhere is a demo and not a medical service or crisis line. If you're in crisis, call or text 988. For a medical emergency, call 911.</p>
-    </main>
+      <p className="text-[12.5px] text-ink2">Somewhere is a demo and not a medical service or crisis line.</p>
+    </div>
   );
 }

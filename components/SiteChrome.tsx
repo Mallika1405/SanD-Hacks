@@ -41,6 +41,7 @@ export function Header() {
           {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`px-3 h-9 inline-flex items-center rounded-lg text-[14px] whitespace-nowrap ${on(n.href) ? "bg-stone font-medium text-ink" : "text-ink2 hover:text-ink"}`}>{n.label}</Link>)}
         </nav>
         <div className="ml-auto flex items-center gap-1.5">
+          <Link href="/voice" aria-label="Voices" title="Choose a voice" className="size-9 inline-flex items-center justify-center rounded-lg text-ink2 hover:text-ink hover:bg-stone"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></svg></Link>
           <ModeToggle />
           <Link href="/you" className="hidden sm:inline-flex items-center h-9 px-3 rounded-lg text-[14px] text-ink2 hover:text-ink">{me?.profile?.name ?? me?.account?.handle ?? "You"}</Link>
           <Link href="/now?sos=1" className="h-9 px-3.5 inline-flex items-center rounded-lg bg-terrasoft text-terradeep text-[14px] font-semibold hover:bg-[#F3CFC2]">I need help now</Link>

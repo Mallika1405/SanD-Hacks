@@ -5,6 +5,7 @@ import { assessSafety } from "@/lib/safety";
 import { out } from "@/lib/speech";
 import { ensureDevice } from "@/lib/device";
 import { q } from "@/lib/db";
+import { personaFor, WRITING_CARE } from "@/lib/personas";
 
 export const maxDuration = 30;
 const Body = z.object({
@@ -32,11 +33,12 @@ export async function POST(req: Request) {
   }
 
   const [prof] = await q<any>("SELECT display_name, conditions FROM profiles WHERE device_id=$1", [device]).catch(() => []);
+  const persona = personaFor(prof?.conditions);
   const themes = await q<any>("SELECT t AS name FROM diary_entries, unnest(themes) t WHERE device_id=$1 GROUP BY t ORDER BY count(*) DESC LIMIT 4", [device]).catch(() => []);
   const convo = msgs.map((m) => `${m.role === "user" ? "Them" : "You"}: ${m.text}`).join("\n");
   const g = await gemini<{ reply: string }>(
     p.data.opening
-      ? `Start a diary conversation. Say hello in one or two short sentences and ask one open, easy question about how they're doing or what's on their mind. Reply JSON {"reply":"..."}`
+      ? `Start a diary conversation. Say hello in one or two short sentences, then ask this one question in your own warm words: "${persona.diaryOpen}". Reply JSON {"reply":"..."}`
       : `Conversation so far:\n${convo}\n\nWrite your next reply. Reply JSON {"reply":"..."}`,
     true,
     {
@@ -50,6 +52,8 @@ How you reply:
 - If they mention going to therapy or a hard session, ask how it went or what they want to bring up next time.
 - If their words suggest hopelessness, feeling like a burden, or not wanting to be here, gently say you're glad they said it, and that talking to their therapist or calling or texting 988 can help. Never dismiss it.
 - Never diagnose, never promise outcomes, never say "calm down", "don't worry" or "you're fine", never give medical advice, never tell them to change medication.
+- Tone for this person: ${persona.style} Never: ${persona.avoid}.
+- ${WRITING_CARE}
 - If they say they're done, say a warm closing line and remind them they can save the entry.`,
     });
   let reply = String(g?.reply ?? "").trim().slice(0, 600);

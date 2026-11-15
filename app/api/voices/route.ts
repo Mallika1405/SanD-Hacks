@@ -4,6 +4,7 @@ import { q } from "@/lib/db";
 import { ensureDevice } from "@/lib/device";
 import { DEFAULT_VOICE, PRESETS, SAMPLE_LINE } from "@/lib/voices";
 import { sign } from "@/lib/speech";
+import { personaFor } from "@/lib/personas";
 
 let cloneOk: { v: boolean; t: number } | null = null;
 async function cloningAvailable() {
@@ -20,9 +21,10 @@ async function cloningAvailable() {
 export async function GET() {
   const device = await ensureDevice();
   const [p] = await q<any>("SELECT voice_id, voice_kind, voice_name, clone_voice_id, clone_name, clone_consent_at, companion_voice_id, diary_voice_id, soothing FROM preferences WHERE device_id=$1", [device]);
+  const [pf] = await q<any>("SELECT conditions FROM profiles WHERE device_id=$1", [device]);
   const clones = await q<any>("SELECT voice_id, name, consent_at FROM cloned_voices WHERE device_id=$1 ORDER BY consent_at", [device]);
   return NextResponse.json({
-    presets: PRESETS, clones,
+    presets: PRESETS, clones, suggested: personaFor(pf?.conditions).voice,
     assigned: { guide: p?.voice_id ?? DEFAULT_VOICE, companion: p?.companion_voice_id ?? p?.voice_id ?? DEFAULT_VOICE, diary: p?.diary_voice_id ?? p?.voice_id ?? DEFAULT_VOICE },
     soothing: !!p?.soothing,
     selected: p?.voice_id ? { id: p.voice_id, kind: p.voice_kind, name: p.voice_name } : { id: DEFAULT_VOICE, kind: "preset", name: PRESETS[0].name },

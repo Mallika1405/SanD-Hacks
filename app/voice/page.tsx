@@ -70,6 +70,14 @@ export default function Voice() {
         <p className="mt-1 text-ink2">Pick a voice that settles you. You can use one voice for everything, or a different one for Juno, the guided exercises and the diary.</p></div>
       {!d && <p className="text-ink2">Loading…</p>}
 
+      {d?.suggested && A.companion !== d.suggested.id && (
+        <section className="card p-4 flex flex-wrap items-center justify-between gap-3" aria-label="Suggested voice">
+          <div><p className="eyebrow">Suggested to start</p><p className="font-medium">{d.suggested.name}{d.suggested.soothing ? ", extra soothing" : ""}</p><p className="text-[13.5px] text-ink2 max-w-[52ch]">{d.suggested.note}</p></div>
+          <div className="flex gap-2"><button onClick={() => preview(d.suggested.id)} className="b b-soft border border-line">{playing === d.suggested.id ? "Playing…" : "Play"}</button>
+            <button onClick={async () => { await fetch("/api/voices", { method: "POST", body: JSON.stringify({ voice_id: d.suggested.id, target: "all" }) }); await fetch("/api/voices", { method: "POST", body: JSON.stringify({ soothing: d.suggested.soothing }) }); setSaved(`${d.suggested.name} will speak everywhere.`); load(); }} className="b b-primary">Use this</button></div>
+        </section>
+      )}
+
       {d && (
         <section className="card p-5 space-y-3" aria-label="Current voices">
           <p className="eyebrow">Right now</p>

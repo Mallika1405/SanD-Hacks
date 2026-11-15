@@ -145,7 +145,7 @@ export default function Diary() {
     <div className="space-y-8 fade-in">
       <section className="max-w-[640px]">
         <h1 className="text-[2rem] leading-[1.15]">Talk it through</h1>
-        <p className="mt-2 text-ink2">Say it out loud or write it. I'll talk back, ask a gentle question now and then, and keep your own words so you can look back on them.</p>
+        <p className="mt-2 text-ink2">Say it out loud or write it. I'll talk back, ask a gentle question now and then, and keep your own words so you can look back on them. <a href="/voice" className="underline">Change the voice</a></p>
       </section>
       {data && (data.signals.length > 0 || data.progress === "improving") && (
         <section className="card p-5 space-y-2" style={data.signals.length ? { background: "var(--terra-soft)" } : { background: "var(--mint-soft)" }} aria-label="What I've noticed">
