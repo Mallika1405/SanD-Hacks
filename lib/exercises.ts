@@ -82,6 +82,53 @@ export const EXERCISES: Exercise[] = [
     ],
   },
   {
+    id: "cold-reset", title: "Cold water reset", blurb: "Cool your face to slow your body", flows: ["panic", "overwhelm"], status: "needs human review",
+    segments: [
+      s("Okay. Your body is running hot with adrenaline. Let's cool it down.", 1600),
+      s("If you can, go to a sink. Run cold water over your wrists, or splash your face. Or hold something cold against your cheeks, like a cold can or a damp cloth.", 6000),
+      s("Cold on the face tells your body to slow your heart rate down. It's a reflex, so it works even if your mind is racing.", 5000),
+      s("Hold it there. And breathe out slowly.", 5200),
+      s("Keep it there for about thirty seconds. Nothing else to do.", 7000),
+      s("If you can't get to water, press your palms to something cool, like a window or a tile floor.", 5500),
+    ],
+  },
+  {
+    id: "push-wall", title: "Push it out", blurb: "Use the adrenaline, then drop it", flows: ["panic", "overwhelm"], status: "needs human review",
+    segments: [
+      s("Your body is full of energy it doesn't need. Let's use it up.", 1600),
+      s("Stand up, and put both hands flat on a wall. Feet back, a little behind you.", 4500),
+      s("Now push into the wall as hard as you can. Really push. Hold it.", 6000),
+      s("And let go. Shake out your arms. Breathe out.", 4500),
+      s("Once more. Push hard into the wall. Hold it.", 6000),
+      s("And drop it. Let your shoulders fall. Slow breath out.", 5000),
+      s("That tight, buzzy feeling is adrenaline, and you just burned some of it off.", 3500),
+    ],
+  },
+  {
+    id: "count-breath", title: "Count it with me", blurb: "Four rounds of slow, counted breathing", flows: ["panic", "overwhelm"], status: "needs human review",
+    segments: [
+      s("Stay with me. We're going to breathe together, and I'll count every one.", 1800),
+      s(`Breathe in through your nose. ${br(700)} Two. ${br(600)} Three. ${br(600)} Four.`, 400),
+      s(`Out through your mouth, slowly. ${br(600)} Two. ${br(650)} Three. ${br(650)} Four. ${br(650)} Five. ${br(650)} Six. ${br(650)} Seven.`, 900),
+      s(`Again. In through your nose. ${br(700)} Two. ${br(600)} Three. ${br(600)} Four.`, 400),
+      s(`And out. ${br(650)} Two. ${br(650)} Three. ${br(650)} Four. ${br(650)} Five. ${br(650)} Six. ${br(650)} Seven.`, 900),
+      s(`One more. In. ${br(700)} Two. ${br(600)} Three. ${br(600)} Four.`, 400),
+      s(`And out. ${br(650)} Two. ${br(650)} Three. ${br(650)} Four. ${br(650)} Five. ${br(650)} Six. ${br(650)} Seven.`, 900),
+      s("Good. Keep that out-breath long, longer than the in-breath. That's what slows your heart.", 3000),
+    ],
+  },
+  {
+    id: "what-is-happening", title: "What your body is doing", blurb: "It's adrenaline, and it has a peak", flows: ["panic"], status: "needs human review",
+    segments: [
+      s("I want you to know what's happening, because it's less scary when you do.", 1800),
+      s("Your body hit its alarm. It released adrenaline, so your heart pounds, your breathing speeds up, and you might feel shaky or dizzy.", 3800),
+      s("It feels dangerous, but it's your body trying to protect you. It can't keep that level up. Adrenaline peaks within a few minutes and then it starts to fall.", 4500),
+      s("Fighting it feeds it. So we let the wave come, and we keep breathing out slowly.", 3800),
+      s("You've gotten through this before, and you're getting through it right now.", 3000),
+      s("Breathe out, long and slow.", 5000),
+    ],
+  },
+  {
     id: "ow-settle", title: "Slow everything down", blurb: "Stop, feet down, shoulders drop", flows: ["overwhelm"], status: "needs human review",
     segments: [
       s("Hey. I'm right here. I'm going to talk you through this, one step at a time.", 1300),
@@ -149,8 +196,8 @@ export const EXERCISES: Exercise[] = [
 
 // Order matters: this is the arc a person is walked through. The agent moves to the next block on its own, with no questions.
 export const BY_FLOW: Record<Exclude<Flow, "unsure">, string[]> = {
-  panic: ["orient-posture", "exhale-breath", "name-it", "ground-54321", "muscle-release", "ride-wave"],
-  overwhelm: ["ow-settle", "exhale-breath", "ow-orient", "ow-one-thing", "muscle-release", "ground-54321"],
+  panic: ["orient-posture", "exhale-breath", "name-it", "what-is-happening", "ground-54321", "cold-reset", "push-wall", "count-breath", "muscle-release", "ride-wave"],
+  overwhelm: ["ow-settle", "exhale-breath", "ow-orient", "ow-one-thing", "cold-reset", "count-breath", "muscle-release", "ground-54321"],
   intrusive: ["intr-notice", "exhale-breath", "intr-uncertainty", "intr-task", "ground-54321"],
 };
 export const getExercise = (id: string) => EXERCISES.find((e) => e.id === id)!;
@@ -163,6 +210,10 @@ export const META: Record<string, { why: string; anchors: string[]; source?: { n
   "ground-54321": { why: "Grounding moves your attention from alarming thoughts to what's around you. It's recommended in psychological first aid guidance, which is expert consensus rather than trial data.", anchors: ["Five things you can see", "Four things you can feel", "Three things you can hear"], source: { name: "SAMHSA Psychological First Aid", url: "https://webarchive.library.unt.edu/eot2008/20080916143942/http://mentalhealth.samhsa.gov/Disasterrelief/pubs/manemotion.asp" } },
   "muscle-release": { why: "Tensing and then releasing muscle groups is a standard relaxation technique used for anxiety. It gives your body something to do with the tension.", anchors: ["Squeeze both fists, then let go", "Shoulders up, then drop", "Press your feet down, then release"] },
   "ride-wave": { why: "Acceptance-based approaches suggest letting the sensations rise and pass instead of fighting them. Fighting a wave tends to make it feel bigger.", anchors: ["Watch the wave rise", "Breathe out slowly", "Stay with the next exhale"] },
+  "cold-reset": { why: "Cool water or a cold pack on the face triggers the dive reflex, which slows the heart rate. It is used in some medical and self-help settings for racing heart. If you have a heart condition or any fainting history, check with your doctor before using it.", anchors: ["Cold water on wrists or face", "Or something cold on your cheeks", "Hold it, and breathe out slowly"] },
+  "push-wall": { why: "Panic leaves you full of adrenaline with nowhere to put it. Strong muscle effort, followed by release, uses some of that energy and gives your body something to do. It is common in self-help guidance for panic rather than a proven treatment.", anchors: ["Hands flat on a wall", "Push hard, hold", "Let go, shake your arms out"] },
+  "count-breath": { why: "A longer out-breath than in-breath slows your breathing, and counting gives your mind something steady to hold. Exhale-focused breathing has some of the best evidence among quick calming techniques, with modest effects.", anchors: ["In through your nose for four", "Out through your mouth for seven", "Longer out than in"] },
+  "what-is-happening": { why: "Understanding that panic is an adrenaline surge that peaks and falls takes away the fear of the fear. Explaining this is a standard first part of treatment for panic. It won't stop the feeling instantly.", anchors: ["It's adrenaline", "It peaks, then it falls", "It can't hurt you"] },
   "ow-settle": { why: "When everything feels like too much, stopping and settling your body first lowers the pressure to solve it all at once.", anchors: ["Hands down, nothing to do", "Both feet on the floor", "Shoulders dropped"] },
   "ow-orient": { why: "Looking around and naming what you see brings your attention back to the room instead of the pile of worries.", anchors: ["Three things you can see", "The colors and shapes", "The surface under your hands"], source: { name: "SAMHSA Psychological First Aid", url: "https://webarchive.library.unt.edu/eot2008/20080916143942/http://mentalhealth.samhsa.gov/Disasterrelief/pubs/manemotion.asp" } },
   "ow-one-thing": { why: "Shrinking everything down to one small, doable step makes it easier to start, and it breaks the freeze of feeling overloaded.", anchors: ["A glass of water", "Sip it slowly", "Stretch your arms overhead"] },

@@ -34,9 +34,10 @@ const S = (text: string, pause_ms = 800, listen = false): Seg => ({ text, pause_
 const TRANSITIONS = ["Good. Stay with me.", "Well done. Next step.", "Keep going. You're doing this.", "Good. Let's keep moving.", "That's it. Next."];
 const FLOW_LABEL: Record<string, string> = { panic: "panic attack", overwhelm: "feeling overwhelmed", talk: "anxiety" };
 
-type Intent = "worse" | "different" | "slower" | "stop" | "helped" | "pause" | "trusted" | "yes" | "no" | "talk";
+type Intent = "still" | "worse" | "different" | "slower" | "stop" | "helped" | "pause" | "trusted" | "yes" | "no" | "talk";
 export function intent(text: string): Intent {
   const n = norm(text);
+  if (/(still (panick|anxious|scared|shaking|freaking|can'?t|not|feel|having|going)|not (going away|stopping|passing|any better)|i'?m (still|really|so) (panick|scared|anxious|shaking|freaking)|(can'?t|cannot) (calm|stop|breathe|catch my breath)|what do i do|help me)/.test(n)) return "still";
   if (/(worse|more anxious|more scared|getting worse|scarier|making it worse)/.test(n)) return "worse";
   if (/(different|something else|another one|not working|doesn't work|isn't (helping|working)|didn't help|try another)/.test(n)) return "different";
   if (/(slower|too fast|slow down|go slower|slowly)/.test(n)) return "slower";
@@ -71,6 +72,22 @@ async function situationOf(text: string): Promise<string | null> {
   if (text.split(/\s+/).length < 6) return null;
   const g = await gemini<{ situation: string }>(`Summarize what this person is going through as a short neutral phrase (max 6 words, no diagnosis, e.g. "panic attack at work"): "${text.slice(0, 300)}". JSON {"situation":"..."}`, true, { timeoutMs: 2500 });
   return g?.situation?.trim().toLowerCase().slice(0, 60) || null;
+}
+
+const STILL_FALLBACK = [
+  "I hear you. It's still loud, and that's okay. The wave can feel endless right at the top, but it can't stay there. Let's do something different, something your body can feel.",
+  "Okay, it's still here. That doesn't mean it's not working. Adrenaline takes a few minutes to fall even when you're doing the right things. We'll try another way in.",
+  "Thank you for telling me. Still panicking means we need a stronger move than before. Stay with me, and do exactly what I say.",
+];
+/** When she says she's still panicking: real validation plus a plain explanation, then the caller moves to a different, stronger technique. */
+async function stillReply(text: string, recent: Ctx["recent"], n: number): Promise<string> {
+  const hist = recent.slice(-6).map((m) => `${m.r === "u" ? "Them" : "You"}: ${m.t}`).join("\n");
+  const g = await gemini<{ say: string }>(`${hist}\nThem: ${text}\n\nReply JSON {"say":"..."}`, true, {
+    timeoutMs: 5000,
+    system: `You are a calm, experienced companion talking out loud with someone who is still having a panic attack after you tried something. Don't repeat the instruction they just tried. In 2 to 3 short sentences: say you hear them, give one specific true reason it's still going (adrenaline takes minutes to fall even when you do the right thing; fighting it keeps it going; it peaks and then eases; it can't hurt them), and tell them you'll try something different that gives their body something to do. Sound like a real person: contractions, plain words, no lists. Never say "calm down" or "don't worry". Never promise it will stop right now. No questions.`,
+  });
+  const t = String(g?.say ?? "").trim();
+  return t && !/(calm down|don'?t worry|\?)/i.test(t) ? t : STILL_FALLBACK[n % STILL_FALLBACK.length];
 }
 
 /** Conversational reply for "just talk to me" mode. Warm, human, short. May include a gentle invitation, never a diagnosis or a promise. */
@@ -261,6 +278,14 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
       else if (i === "slower") { ctx.slow = true; if (ctx.exId) replayFrom(resumeAt, [S("Okay. Slower.", 600)]); else begin([S("Okay. Slower.", 600)]); }
       else if (i === "worse") { if (ctx.exId) ctx.worse.push(ctx.exId); begin([S("Okay. Let's change it. Follow my voice.", 600)]); }
       else if (i === "different") begin([S("Okay. Let's change it. Follow my voice.", 600)]);
+      else if (i === "still") {
+        const reply = await stillReply(text, ctx.recent, ctx.turns); ctx.recent.push({ r: "a", t: reply });
+        if (ctx.exId) ctx.worse = ctx.worse.filter((x) => x !== ctx.exId);
+        // Escalate: move on to the next block (never the same one again), starting with the body-based ones.
+        const physical = ["cold-reset", "push-wall", "count-breath"].filter((id) => !ctx.tried.includes(id) && BY_FLOW[seqFlow()].includes(id))[0];
+        if (physical) forced = physical;
+        begin([S(reply, 900)]);
+      }
       else if (i === "helped") { if (ctx.exId && !ctx.helped.includes(ctx.exId)) ctx.helped.push(ctx.exId); if (ctx.exId) replayFrom(resumeAt, [S("Good. Stay with it.", 500)]); else begin(); }
       else if (i === "pause") say = [];
       else {

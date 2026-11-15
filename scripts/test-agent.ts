@@ -31,6 +31,7 @@ const cases: [string, SafetyLevel][] = [
   show("done", await turn(s.id, d.id, { event: "segments_done" }));
   show("worse", await turn(s.id, d.id, { text: "that made it worse" }));
   show("talk", await turn(s.id, d.id, { text: "I just feel so tired of all of this", spoken_idx: 2 }));
+  show("still", await turn(s.id, d.id, { text: "I'm still panicking" }));
   show("dizzy", await turn(s.id, d.id, { text: "I feel really dizzy", spoken_idx: 1 }));
   show("no", await turn(s.id, d.id, { text: "no" }));
   show("chest", await turn(s.id, d.id, { text: "my chest hurts" }));

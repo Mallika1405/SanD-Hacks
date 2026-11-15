@@ -21,7 +21,7 @@ Uses `.env.local` (`DATABASE_URL`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, 
 The app opens on **/login** (account, guest, or demo profile). Everything else needs you to have entered.
 - **Today (`/`)**: greeting, a one-tap "how anxious are you" check, anything worth a look from your diary, and a short list.
 - **Talk (`/now`)**: pick what is happening; Juno, a live ElevenLabs voice agent (Gemini), talks with you and guides you. A scripted fallback guide runs if the live agent is unavailable.
-- **Diary (`/diary`)**: you talk, it listens. Each entry gets a risk level; worrying entries and trends show a card with 988, 911 and a note to copy for your therapist.
+- **Diary (`/diary`)**: a real conversation. Talk or write; it answers, asks a gentle follow-up, and offers a small idea when you are struggling. Your own words are saved with the entry (switch it off per entry if you prefer). Each entry gets a risk level; worrying entries and trends show 988, 911 and a note to copy for your therapist.
 - **Tracker (`/tracker`)**: OCD urges, panic episodes, daily mood, with insights.
 - **Therapy (`/therapy`)**: your plan, next session, "did you go?", what to bring, homework checklist, attendance.
 - **Find care (`/care`)**: city, insurance, care type. Bright Data reads public pages live, Gemini extracts, Neon stores. Every listing is labelled unverified, with an outreach script.
