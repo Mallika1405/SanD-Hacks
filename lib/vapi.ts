@@ -7,9 +7,9 @@ export const vapiEnabled = () => !!(process.env.VAPI_API_KEY && process.env.VAPI
 const API = "https://api.vapi.ai";
 const hdr = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${process.env.VAPI_API_KEY}` });
 
-export async function createVapiCall(opts: { to: string; callRowId: string; contactName: string; userName: string; where: string }) {
+export async function createVapiCall(opts: { to: string; callRowId: string; contactName: string; userName: string; what: string; where: string }) {
   const voiceId = process.env.ELEVENLABS_VOICE_ID || "EXAVITQu4vr4xnSDxMaL";
-  const first = `Hi ${opts.contactName}. This is Haven, a safety app. ${opts.userName} just asked her emergency contacts for help${opts.where}. She may need someone. Can you respond? Please say "I'm responding" if you can help.`;
+  const first = `Hi ${opts.contactName}. This is Haven, a safety app. ${opts.userName} just asked her emergency contacts for help. ${opts.what}${opts.where} Can you respond? Please say "I'm responding" if you can help.`;
   const r = await fetch(`${API}/call`, {
     method: "POST", headers: hdr(), signal: AbortSignal.timeout(15000),
     body: JSON.stringify({

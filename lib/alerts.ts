@@ -3,6 +3,7 @@ import { q } from "./db";
 import { recordIncident } from "./incidents";
 import { baseUrl, client, isEmergencyNumber, sendSms, twilioEnabled, VoiceResponse } from "./twilio";
 import { speak } from "./tts";
+import { reverseGeocode } from "./geocode";
 import { createVapiCall, vapiEnabled, vapiSayAndEnd } from "./vapi";
 
 export type Alert = {
@@ -25,13 +26,19 @@ export async function createAlert(input: {
   const token = crypto.randomBytes(24).toString("base64url");
   const ownerSecret = crypto.randomBytes(16).toString("base64url");
   const hasGeo = input.lat != null && input.lng != null;
+  // Street address (best effort, 2.5s cap) plus the nearest known place, e.g. "9500 Gilman Drive, near Geisel Library".
+  let placeText = input.placeText;
+  if (hasGeo) {
+    const addr = await reverseGeocode(input.lat!, input.lng!);
+    if (addr) placeText = placeText && !addr.toLowerCase().includes(placeText.toLowerCase()) ? `${addr}, near ${placeText}` : addr;
+  }
   const [alert] = await q<Alert>(
     `INSERT INTO alerts(user_id, session_id, token, owner_secret, reason, place_text, kind, geom)
      VALUES ($1,$2,$3,$4,$5,$6,'${input.kind ?? "alert"}', ${hasGeo ? "ST_SetSRID(ST_MakePoint($8,$7),4326)::geography" : "NULL"})
      RETURNING *`,
     hasGeo
-      ? [input.userId, input.sessionId ?? null, token, ownerSecret, input.reason ?? null, input.placeText ?? null, input.lat, input.lng]
-      : [input.userId, input.sessionId ?? null, token, ownerSecret, input.reason ?? null, input.placeText ?? null],
+      ? [input.userId, input.sessionId ?? null, token, ownerSecret, input.reason ?? null, placeText ?? null, input.lat, input.lng]
+      : [input.userId, input.sessionId ?? null, token, ownerSecret, input.reason ?? null, placeText ?? null],
   );
   await logEvent(alert.id, alert.session_id, "alert_created", input.reason ?? "alert");
   if (hasGeo && alert.kind === "alert") recordIncident(input.lat!, input.lng!, "alert").catch(() => {});
@@ -45,10 +52,21 @@ async function userName(userId: string) {
   return u?.name ?? "Someone";
 }
 
+export function describeReason(reason: string | null) {
+  const r = (reason ?? "").toLowerCase();
+  if (r.includes("followed")) return "She said she is being followed.";
+  if (r.includes("voice trigger")) return "She said her safety code word, or the word help.";
+  if (r.includes("feels off")) return "She said she feels unwell or unsafe at a party.";
+  if (r.includes("emergency")) return "She started emergency mode.";
+  if (r.includes("ride check-in")) return "Her ride went off its route and she did not confirm she was okay.";
+  if (r.includes("manual")) return "She pressed and held her alert button.";
+  return "She asked for help.";
+}
+
 export async function briefing(alert: Alert) {
   const name = await userName(alert.user_id);
-  const where = alert.place_text ? ` at ${alert.place_text}` : "";
-  return `This is Haven, a safety app. ${name} just asked her emergency contacts for help${where}. She may need someone. If you can respond, press 1 now. If this is an emergency, call 9 1 1.`;
+  const where = alert.place_text ? ` She is at ${alert.place_text}.` : "";
+  return `This is Haven, a safety app. ${name} has just asked her emergency contacts for help. ${describeReason(alert.reason)}${where} If you can respond, press 1 now. If this is an emergency, call 9 1 1.`;
 }
 
 export function responderLink(alert: Alert, contactId?: string) {
@@ -81,7 +99,7 @@ async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[])
       }
       if (vapiEnabled() && process.env.CALL_PROVIDER !== "twilio") {
         try {
-          const v = await createVapiCall({ to: c.phone, callRowId: row.id, contactName: c.name, userName: name, where });
+          const v = await createVapiCall({ to: c.phone, callRowId: row.id, contactName: c.name, userName: name, what: describeReason(alert.reason), where: alert.place_text ? ` She is at ${alert.place_text}.` : "" });
           await q("UPDATE alert_calls SET call_sid=$2, control_url=$3, provider='vapi', status='initiated', updated_at=now() WHERE id=$1", [row.id, v.id, v.controlUrl]);
         } catch (e) {
           await q("UPDATE alert_calls SET status='failed', provider='vapi', updated_at=now() WHERE id=$1", [row.id]);
@@ -195,8 +213,21 @@ export async function handleDigit(callId: string, digit: string) {
   await q("UPDATE alert_calls SET digit=$2, updated_at=now() WHERE id=$1", [callId, digit]);
   if (digit !== "1") return { done: false, message: "" };
   const r = await claimAlert(row.alert_id, row.contact_id);
-  if (!r.won && r.alert?.claimed_by === row.contact_id) return { done: true, message: "You are responding. We just texted you a live link. Stay safe." };
-  if (r.won) return { done: true, message: "You are responding. We just texted you a live link. Stay safe." };
+  if ((!r.won && r.alert?.claimed_by === row.contact_id) || r.won) return { done: true, message: await respondingMessage(row.alert_id) };
   if (r.claimerName) return { done: true, message: `${r.claimerName} is responding. You do not need to do anything else.` };
   return { done: true, message: "This alert is no longer active." };
+}
+
+/** What a responder hears after claiming: where she is, why, and how to reach her. Spoken, so no links. */
+async function respondingMessage(alertId: string) {
+  const [a] = await q<Alert & { user_name: string; user_phone: string | null }>(
+    "SELECT a.*, u.name AS user_name, u.phone AS user_phone FROM alerts a JOIN users u ON u.id=a.user_id WHERE a.id=$1", [alertId]);
+  if (!a) return "You are responding. Thank you.";
+  const parts = [`Thank you. You are responding to ${a.user_name}.`, describeReason(a.reason)];
+  if (a.place_text) parts.push(`She is at ${a.place_text}.`);
+  const digits = (a.user_phone ?? "").replace(/\D/g, "");
+  if (digits.length >= 10 && !digits.startsWith("1555") && !digits.startsWith("555")) parts.push(`Call her now at ${digits.replace(/^1(?=\d{10}$)/, "").split("").join(" ")}.`);
+  else parts.push("Try calling or texting her now.");
+  parts.push("If she is in danger, call 9 1 1.");
+  return parts.join(" ");
 }
