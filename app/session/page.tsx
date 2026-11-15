@@ -3,8 +3,8 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Seg = { text: string; pause_ms: number; listen?: boolean; sig: string; fb?: string };
-type Ui = { crisis?: "self_harm" | "medical"; finish?: boolean; followup?: boolean; trusted?: boolean; checkinConsent?: boolean; suggestCare?: boolean; done?: boolean };
-type Out = { say: Seg[]; lead: number; exBase: number; state: string; flow: string; exerciseTitle?: string; ui: Ui };
+type Ui = { crisis?: "self_harm" | "medical"; finish?: boolean; followup?: boolean; trusted?: boolean; checkinConsent?: boolean; suggestCare?: boolean; done?: boolean; rate?: boolean; source?: { name: string; url: string; title: string } };
+type Out = { say: Seg[]; lead: number; exBase: number; state: string; flow: string; exerciseId?: string; exerciseTitle?: string; ui: Ui; research?: { key: string } };
 
 const TRUST_MSG = "I'm having a hard time right now. Can you stay in touch with me?";
 const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
@@ -24,6 +24,9 @@ function Session() {
   const [toast, setToast] = useState("");
   const [typed, setTyped] = useState("");
   const [voiceName, setVoiceName] = useState("");
+  const [src, setSrc] = useState<{ name: string; url: string; title: string } | null>(null);
+  const [tech, setTech] = useState<{ status: string | null; items: { title: string; source_name: string; source_url: string }[] }>({ status: null, items: [] });
+  const pollOn = useRef(false);
 
   const audio = useRef<HTMLAudioElement | null>(null);
   const orb = useRef<HTMLDivElement | null>(null);
@@ -39,6 +42,18 @@ function Session() {
   const firstOut = useRef<Out | null>(null);
   const echoUntil = useRef(0);
   const actx = useRef<AudioContext | null>(null);
+
+  /** Poll what Bright Data has found so far for her situation (runs in the background on the server). */
+  const startPoll = () => {
+    if (pollOn.current) return; pollOn.current = true; let n = 0;
+    setTech((t) => ({ ...t, status: "pending" }));
+    const iv = setInterval(async () => {
+      n++;
+      const j = await fetch(`/api/sos/techniques?session=${sessionId}`).then((r) => r.json()).catch(() => null);
+      if (j) setTech(j);
+      if (n >= 20 || (j && j.status && j.status !== "pending")) { clearInterval(iv); pollOn.current = false; }
+    }, 4000);
+  };
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 5000); };
 
@@ -115,6 +130,8 @@ function Session() {
   const handleOut = useCallback(async (out: Out) => {
     if (out.exerciseTitle) setTitle(out.exerciseTitle);
     setUi(out.ui);
+    if (out.ui.source) setSrc(out.ui.source); else if (out.exerciseId && !out.exerciseId.startsWith("src:")) setSrc(null);
+    if (out.research) startPoll();
     if (out.ui.crisis) setCrisis(out.ui.crisis);
     if (out.ui.checkinConsent) fetch("/api/checkins", { method: "POST", body: JSON.stringify({ sessionId, hour: new Date().getHours() }) }).catch(() => {});
     const finished = await play(out);
@@ -208,13 +225,30 @@ function Session() {
       <div className="flex-1 flex flex-col justify-center gap-6">
         <div ref={orb} className={`orb ${mode === "listening" ? "listening" : mode === "paused" || mode === "idle" ? "paused" : ""}`} aria-hidden />
         {title && <p className="text-center text-sm text-muted">{title}</p>}
+        {src && <p className="text-center text-xs text-muted">From {src.name}: <a className="underline" target="_blank" rel="noreferrer" href={src.url}>{src.title}</a> · not reviewed by a clinician</p>}
         <p aria-live="polite" className="text-2xl text-center leading-snug min-h-28">{caption || "…"}</p>
+        {tech.status && (
+          <details className="bg-surface rounded-xl px-4 py-3 text-sm">
+            <summary className="cursor-pointer min-h-8 flex items-center text-teal">
+              {tech.status === "pending" ? "● Looking up calming approaches from trusted sources…" : tech.items.length ? `✓ Found ${tech.items.length} approaches from ${[...new Set(tech.items.map((i) => i.source_name))].slice(0, 2).join(" and ")}` : "No extra approaches found. Using the reviewed ones."}
+            </summary>
+            <ul className="mt-2 space-y-1.5">
+              {tech.items.map((i) => <li key={i.title + i.source_url}><a className="underline" target="_blank" rel="noreferrer" href={i.source_url}>{i.title}</a> <span className="text-muted">· {i.source_name}</span></li>)}
+            </ul>
+            <p className="text-xs text-muted mt-2">Found on public pages and turned into short steps. Not reviewed by a clinician. For intrusive thoughts I only use reviewed exercises.</p>
+          </details>
+        )}
         {voiceName && <p className="text-xs text-center text-muted">Guidance read in {voiceName}'s voice</p>}
         {toast && <p role="status" className="text-center text-teal text-sm">{toast}</p>}
         {needsTap && <button onClick={begin} className="mx-auto min-h-16 px-8 rounded-2xl bg-accent text-ground text-lg font-bold">Tap to start the voice</button>}
         {!sttOk && <p role="status" className="text-center text-amber text-sm">I can't hear you in this browser. Use the buttons below instead, or open this in Chrome.</p>}
       </div>
 
+      {ui.rate && !done && (
+        <div role="group" aria-label="How intense is it, from one to ten" className="grid grid-cols-5 gap-2 mb-3">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => <button key={n} onClick={() => say(String(n))} className="min-h-12 rounded-xl bg-surface text-lg text-ink">{n}</button>)}
+        </div>
+      )}
       {ui.finish && !done && (
         <div className="grid grid-cols-1 gap-2 mb-3">
           <button onClick={() => say("keep going")} className="min-h-14 rounded-2xl bg-surface text-lg">Keep going</button>

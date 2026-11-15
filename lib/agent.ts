@@ -4,19 +4,20 @@ import { assessSafety, CRISIS_SEGS, MEDICAL_SEGS, SAFETY_QUESTION } from "./safe
 import { BY_FLOW, Flow as ExerciseFlow, getExercise } from "./exercises";
 type Flow = ExerciseFlow | "checkin";
 import { out, OutSeg, Seg } from "./speech";
+import { listSourced, slug } from "./techniques";
 
 export type State = "start" | "support" | "adapt" | "finish" | "followup" | "crisis";
-type Pending = "flow" | "safety" | "continue" | "finish_choice" | "checkin" | "checkin_reply";
+type Pending = "flow" | "safety" | "continue" | "finish_choice" | "checkin" | "checkin_reply" | "rate" | "situation";
 type Ctx = {
-  exId?: string; checkinId?: string; tried: string[]; helped: string[]; worse: string[]; slow?: boolean; pending?: Pending;
+  exId?: string; checkinId?: string; ratings?: number[]; sit?: string; rkey?: string; rcount?: number; tried: string[]; helped: string[]; worse: string[]; slow?: boolean; pending?: Pending;
   resumeIdx?: number; recent: { r: "u" | "a"; t: string }[]; turns: number;
 };
 export type TurnInput = {
   event?: "start" | "segments_done" | "okay_now" | "resume" | "help_now" | "safe_now"; text?: string; spoken_idx?: number; interrupted?: boolean;
 };
 export type TurnOut = {
-  say: OutSeg[]; lead: number; exBase: number; state: State; flow: Flow; exerciseId?: string; exerciseTitle?: string;
-  ui: { crisis?: "self_harm" | "medical"; finish?: boolean; followup?: boolean; trusted?: boolean; checkinConsent?: boolean; suggestCare?: boolean; done?: boolean };
+  say: OutSeg[]; lead: number; exBase: number; state: State; flow: Flow; exerciseId?: string; exerciseTitle?: string; research?: { key: string; flow: string; sit: string };
+  ui: { crisis?: "self_harm" | "medical"; finish?: boolean; followup?: boolean; trusted?: boolean; checkinConsent?: boolean; suggestCare?: boolean; done?: boolean; rate?: boolean; source?: { name: string; url: string; title: string } };
 };
 
 const norm = (t: string) => t.toLowerCase().replace(/[’]/g, "'").replace(/[^a-z0-9' ]/g, " ").replace(/\s+/g, " ").trim();
@@ -56,6 +57,14 @@ async function freeTalk(flow: string, text: string, recent: Ctx["recent"]): Prom
   return say;
 }
 
+const WORDS: Record<string, number> = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+export function parseRating(text: string): number | null {
+  const n = norm(text);
+  const d = n.match(/\b(10|[0-9])\b/); if (d) return Number(d[1]);
+  const w = n.match(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/); return w ? WORDS[w[1]] : null;
+}
+const FLOW_LABEL: Record<string, string> = { panic: "panic attack", overwhelm: "feeling overwhelmed" };
+
 const ACKS = ["Good.", "That's it.", "Nicely done.", "Okay. Stay with that."];
 
 export async function turn(sessionId: string, deviceId: string, input: TurnInput): Promise<TurnOut> {
@@ -66,6 +75,20 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   let flow: Flow = row.flow;
   const [pr] = await q<{ prefers: any }>("SELECT prefers FROM preferences WHERE device_id=$1", [deviceId]);
   const favorite: string | undefined = pr?.prefers?.favorite_exercise;
+  // Techniques Bright Data found for this person's situation (never used for intrusive thoughts: reviewed exercises only).
+  const sourced = ctx.rkey && flow !== "intrusive" ? await listSourced(ctx.rkey) : [];
+  const exMap = new Map<string, any>(sourced.map((e) => [e.id, e]));
+  const getEx = (id: string): any => exMap.get(id) ?? getExercise(id);
+  let research: TurnOut["research"];
+  const startResearch = (sit: string, force = false) => {
+    if (flow === "intrusive" || flow === "unsure") return;
+    if (ctx.rkey && !force) return;
+    if ((ctx.rcount ?? 0) >= 2) return;
+    const f = flow === "panic" ? "panic" : "overwhelm";
+    const key = `${f}:${slug(sit)}`;
+    if (key === ctx.rkey) return;
+    ctx.sit = sit; ctx.rkey = key; ctx.rcount = (ctx.rcount ?? 0) + 1; research = { key, flow: f, sit };
+  };
   let say: Seg[] = [];
   const ui: TurnOut["ui"] = {};
   let ended = false;
@@ -76,21 +99,29 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   if (text) { ctx.recent.push({ r: "u", t: text.slice(0, 300) }); ctx.turns++; }
 
   const pick = (f: Exclude<ExerciseFlow, "unsure">) => {
-    let order = BY_FLOW[f].filter((id) => !ctx.tried.includes(id) && !ctx.worse.includes(id));
-    if (!order.length) { ctx.tried = []; order = BY_FLOW[f].filter((id) => !ctx.worse.includes(id)); }
-    if (!order.length) order = BY_FLOW[f];
-    return favorite && order.includes(favorite) ? favorite : order[0];
+    const lib = BY_FLOW[f], srcIds = sourced.map((e) => e.id);
+    const unseen = (ids: string[]) => ids.filter((id) => !ctx.tried.includes(id) && !ctx.worse.includes(id));
+    // First technique is always a reviewed one (instant). After that, prefer what was researched for her situation.
+    let order = ctx.tried.length === 0 ? [...unseen(lib), ...unseen(srcIds)] : [...unseen(srcIds), ...unseen(lib)];
+    if (!order.length) { ctx.tried = []; order = [...srcIds, ...lib].filter((id) => !ctx.worse.includes(id)); }
+    if (!order.length) order = lib;
+    return favorite && ctx.tried.length === 0 && order.includes(favorite) ? favorite : order[0];
   };
   const begin = (leadSegs: Seg[] = []) => {
     const f = (flow === "unsure" || flow === "checkin" ? "overwhelm" : flow) as Exclude<ExerciseFlow, "unsure">;
-    const id = pick(f); const ex = getExercise(id);
+    const id = pick(f); const ex = getEx(id);
     ctx.exId = id; ctx.tried.push(id); ctx.pending = undefined; ctx.resumeIdx = undefined; state = "support";
-    say = [...leadSegs, ...ex.segments.map((s) => ({ ...s }))]; lead = leadSegs.length; exBase = 0;
+    const l = id.startsWith("src:") ? [...leadSegs, S(`Here's an approach from ${ex.source_name}.`, 500)] : leadSegs;
+    say = [...l, ...ex.segments.map((s: Seg) => ({ ...s }))]; lead = l.length; exBase = 0;
   };
   const replayFrom = (idx: number, leadSegs: Seg[] = []) => {
-    const ex = getExercise(ctx.exId!); ctx.pending = undefined; ctx.resumeIdx = undefined; state = "support";
+    const ex = getEx(ctx.exId!); ctx.pending = undefined; ctx.resumeIdx = undefined; state = "support";
     const rest = ex.segments.slice(Math.max(0, idx));
     say = [...leadSegs, ...(rest.length ? rest : [S("We've reached the end of this one.", 800)])]; lead = leadSegs.length; exBase = Math.max(0, idx);
+  };
+  const askRate = (leadSegs: Seg[] = []) => {
+    state = "adapt"; ctx.pending = "rate"; ui.rate = true;
+    say = [...leadSegs, S("On a scale of one to ten, where is it now? One is calm. Ten is the hardest it's been.", 300, true)];
   };
   const crisis = (kind: "self_harm" | "medical") => {
     state = "crisis"; ui.crisis = kind; ctx.pending = undefined;
@@ -149,15 +180,38 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
       say = [S(line, 600), S("How are you doing right now?", 400, true)];
     } else if (input.event === "start") {
       if (flow === "unsure") { ctx.pending = "flow"; say = [S("I'm here with you.", 700), S("What's it like right now? You can say panic, a thought that won't leave, or that it's all a lot.", 400, true)]; }
-      else begin([S("I'm here with you. We'll go slowly.", 700)]);
+      else { startResearch(FLOW_LABEL[flow] ?? "feeling overwhelmed"); begin([S("I'm here with you. I'll guide you through this, one step at a time.", 700)]); }
     } else if (input.event === "okay_now") finish();
     else if (input.event === "resume") { if (ctx.exId) replayFrom((input.spoken_idx ?? -1) + (input.interrupted ? 0 : 1)); else begin(); }
     else if (input.event === "segments_done") {
-      if (state === "support") { state = "adapt"; ctx.pending = "continue"; say = [S("Would you like to keep going, or stop here?", 400, true)]; }
+      if (state === "support") askRate();
     } else if (text) {
       const i = intent(text);
       const resumeAt = (input.spoken_idx ?? -1) + (input.interrupted ? 0 : 1);
-      if (ctx.pending === "checkin_reply") {
+      if (ctx.pending === "rate") {
+        const n = parseRating(text);
+        if (n != null) {
+          const prev = ctx.ratings?.[ctx.ratings.length - 1]; (ctx.ratings ??= []).push(n);
+          const markHelped = () => { if (ctx.exId && !ctx.helped.includes(ctx.exId)) ctx.helped.push(ctx.exId); };
+          if (n <= 3) { markHelped(); ctx.pending = "continue"; state = "adapt"; say = [S(`${n}. That's a lot lower. I'm glad.`, 500), S("Would you like to stay with me a little longer, or stop here?", 400, true)]; }
+          else if (prev == null && n >= 7) { ctx.pending = "situation"; say = [S("Thank you. That's a lot, and I'm still here.", 600), S("If you want to tell me, what's the hardest part right now? Or say skip, and I'll try something different.", 400, true)]; }
+          else if (prev == null) begin([S(`${n}. Okay. Let's keep going, a little more.`, 600)]);
+          else if (n < prev) { markHelped(); begin([S(`It's coming down, from ${prev} to ${n}. Let's keep going.`, 600)]); }
+          else { begin([S("It's not moving much yet. That's okay. Let's try something different.", 700)]); }
+        } else if (i === "stop") finish();
+        else if (i === "different" || i === "worse") begin([S("Okay. Let's try something different.", 600)]);
+        else if (i === "yes") begin([S("Okay.", 400)]);
+        else askRate([S("A number from one to ten is fine.", 300)]);
+      } else if (ctx.pending === "situation") {
+        if (i === "different" || i === "no" || i === "stop" || /\bskip\b/.test(norm(text))) begin([S("Okay. Let's try something different.", 600)]);
+        else {
+          const g = await gemini<{ situation: string }>(`Summarize what this person is going through as a short neutral phrase (max 6 words, no diagnosis, e.g. "panic attack at work"): "${text.slice(0, 300)}". JSON {"situation":"..."}`, true, { timeoutMs: 3000 });
+          const sit = g?.situation?.trim().toLowerCase().slice(0, 60);
+          if (sit) startResearch(sit, true);
+          const reply = await freeTalk(flow, text, ctx.recent);
+          begin([S(reply, 700), S("Let's try something that might fit that better.", 600)]);
+        }
+      } else if (ctx.pending === "checkin_reply") {
         const n = norm(text);
         const neg = /(not good|not great|not okay|not ok|bad|anxious|rough|hard|worse|tough|stress|panic|scared|overwhelm|struggl|tired|awful|terrible|can't|cant)/.test(n);
         const pos = /\b(good|fine|okay|ok|better|great|well|alright|calm)\b/.test(n);
@@ -165,9 +219,11 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
         else if (pos) { ctx.pending = undefined; ui.done = true; say = [S("I'm glad to hear that. I'm here whenever you need me.", 500)]; }
         else { const reply = await freeTalk("overwhelm", text, ctx.recent); ctx.pending = "continue"; state = "adapt"; say = [S(reply, 700), S("Would you like to try something together, or stop here?", 400, true)]; }
       } else if (ctx.pending === "flow") {
-        const f = detectFlow(text) ?? (await gemini<{ flow: string }>(`Which best fits? panic, intrusive (unwanted repeating thoughts), or overwhelm. Text: "${text.slice(0, 300)}". JSON {"flow":"..."}`, true, { timeoutMs: 3000 }))?.flow;
+        const g = await gemini<{ flow: string; situation: string }>(`Someone in distress said: "${text.slice(0, 300)}". Which best fits: panic, intrusive (unwanted repeating thoughts), or overwhelm? Also summarize what they are going through as a short neutral phrase (max 6 words, no diagnosis, e.g. "panic attack at work"). JSON {"flow":"...","situation":"..."}`, true, { timeoutMs: 3500 });
+        const f = detectFlow(text) ?? g?.flow;
         flow = (["panic", "intrusive", "overwhelm"].includes(f as string) ? f : "overwhelm") as Flow;
-        begin([S("Thank you. Let's do this together.", 600)]);
+        startResearch((g?.situation ?? "").toLowerCase().slice(0, 60) || FLOW_LABEL[flow] || "feeling overwhelmed");
+        begin([S("Thank you for telling me. I'll guide you through this, one step at a time.", 600)]);
       } else if (ctx.pending === "checkin") {
         if (i === "yes") { ui.checkinConsent = true; say = [S("Okay. I'll remember that. Take care of yourself.", 500)]; ui.done = true; }
         else { say = [S("No problem. Take care of yourself.", 500)]; ui.done = true; }
@@ -191,7 +247,7 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
       else if (ctx.pending === "continue" && i === "no") finish();
       else {
         // Free talk. If the person is answering a "say it out loud" step, just acknowledge and carry on.
-        const ex = ctx.exId ? getExercise(ctx.exId) : null;
+        const ex = ctx.exId ? getEx(ctx.exId) : null;
         const cur = ex && input.spoken_idx != null ? ex.segments[input.spoken_idx] : null;
         const short = text.split(/\s+/).length <= 8;
         const seeksReassurance = flow === "intrusive" && /(am i|will i|is it|what if|do you think|are you sure|promise|tell me).*(okay|ok|fine|safe|happen|true|real|bad|wrong|crazy|dangerous)/.test(norm(text));
@@ -214,12 +270,13 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   if (say.length && say[0]) ctx.recent.push({ r: "a", t: say.map((s) => s.text).join(" ").slice(0, 200) });
   ctx.recent = ctx.recent.slice(-6);
   if (ended || ui.done) ctx.recent = [];
-  const ex = ctx.exId ? getExercise(ctx.exId) : null;
+  const ex = ctx.exId ? getEx(ctx.exId) : null;
+  if (ex?.source_url) ui.source = { name: ex.source_name, url: ex.source_url, title: ex.title };
   await q(
     `UPDATE sessions SET state=$2, ctx=$3, flow=$4, helpful_exercise_ids=$5, ended_at=CASE WHEN $6 THEN now() ELSE ended_at END,
        summary=CASE WHEN $6 THEN $7 ELSE summary END WHERE id=$1`,
     [sessionId, state, JSON.stringify(ctx), flow, ctx.helped, ended, `${flow}; tried ${ctx.tried.join(", ") || "none"}; helped ${ctx.helped.join(", ") || "none"}`]);
 
   if (lead < 0) lead = say.length;
-  return { say: out(say, ctx.slow), lead, exBase, state, flow: flow as any, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui };
+  return { say: out(say, ctx.slow), lead, exBase, state, flow: flow as any, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui, research };
 }

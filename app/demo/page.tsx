@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const STEPS: { say: string; expect: string }[] = [
-  { say: "Tap Start SOS session (Panic).", expect: "A calm voice begins slow breathing right away. No questions first." },
+  { say: "Tap Start SOS session (Panic).", expect: "A calm voice begins slow breathing right away, no questions first. In the background, Bright Data starts researching calming techniques for it (see the green line on screen)." },
+  { say: "When the exercise ends, answer the 1 to 10 question, for example \"seven\".", expect: "A high number: it asks what's hardest, then researches that and switches to a technique found from a trusted source, shown with its link." },
   { say: "Interrupt it mid-sentence: \"slower\".", expect: "It stops instantly, says \"Okay. Slower.\" and resumes from where it was, with longer pauses." },
   { say: "Say \"something else\".", expect: "It switches to a different exercise." },
   { say: "Say \"that made it worse\".", expect: "It thanks you, remembers not to repeat that exercise, and tries another." },

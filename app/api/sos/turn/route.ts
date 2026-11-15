@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { turn } from "@/lib/agent";
 import { currentDevice } from "@/lib/device";
+import { q } from "@/lib/db";
+import { researchTechniques } from "@/lib/techniques";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 const Body = z.object({
   sessionId: z.string().uuid(),
   event: z.enum(["start", "segments_done", "okay_now", "resume", "help_now", "safe_now"]).optional(),
@@ -19,7 +21,14 @@ export async function POST(req: Request) {
   if (!p.success) return NextResponse.json({ error: "bad request" }, { status: 400 });
   try {
     const { sessionId, ...input } = p.data;
-    return NextResponse.json(await turn(sessionId, device, input));
+    const res = await turn(sessionId, device, input);
+    if (res.research) {
+      // Bright Data research runs in the background so her first seconds are never slowed.
+      const r = res.research;
+      await q("UPDATE sessions SET research_key=$2, research='pending' WHERE id=$1", [sessionId, r.key]);
+      after(() => researchTechniques(r.key, r.flow, r.sit, sessionId));
+    }
+    return NextResponse.json(res);
   } catch (e) {
     console.error("turn failed", e);
     return NextResponse.json({ error: "turn failed" }, { status: 500 });
