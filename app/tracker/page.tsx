@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { Count } from "@/components/Motion";
 
 type Kind = "ocd_urge" | "panic_episode" | "daily";
 const TABS: { id: Kind; label: string; sub: string }[] = [
@@ -123,9 +124,9 @@ export default function Tracker() {
             {data && I.total > 0 && kind === "ocd_urge" && (
               <>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.resisted}</p><p className="text-[12px] text-ink2">Resisted</p></div>
-                  <div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.delayed}</p><p className="text-[12px] text-ink2">Delayed</p></div>
-                  <div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.did}</p><p className="text-[12px] text-ink2">Did it</p></div>
+                  <div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.resisted) || 0} /></p><p className="text-[12px] text-ink2">Resisted</p></div>
+                  <div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.delayed) || 0} /></p><p className="text-[12px] text-ink2">Delayed</p></div>
+                  <div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.did) || 0} /></p><p className="text-[12px] text-ink2">Did it</p></div>
                 </div>
                 <p className="text-[15px]">You delayed or resisted <b>{I.total - I.did} of {I.total}</b> urges{I.rateLast != null ? ` (${I.rateLast}% of your last ${Math.min(7, I.total)})` : ""}.{I.ratePrev != null && I.rateLast != null && I.rateLast !== I.ratePrev ? ` The week before it was ${I.ratePrev}%.` : ""}</p>
                 {I.avgDelay != null && <p className="text-[15px]">When you delay, you wait about <b>{I.avgDelay} minutes</b> on average.</p>}
@@ -137,14 +138,14 @@ export default function Tracker() {
             )}
             {data && I.total > 0 && kind === "panic_episode" && (
               <>
-                <div className="grid grid-cols-3 gap-2 text-center"><div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.thisWeek}</p><p className="text-[12px] text-ink2">This week</p></div><div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.avgIntensity}</p><p className="text-[12px] text-ink2">Avg intensity</p></div><div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.avgMinutes}</p><p className="text-[12px] text-ink2">Avg minutes</p></div></div>
+                <div className="grid grid-cols-3 gap-2 text-center"><div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.thisWeek) || 0} /></p><p className="text-[12px] text-ink2">This week</p></div><div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.avgIntensity) || 0} decimals={1} /></p><p className="text-[12px] text-ink2">Avg intensity</p></div><div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.avgMinutes) || 0} decimals={1} /></p><p className="text-[12px] text-ink2">Avg minutes</p></div></div>
                 <div><p className="eyebrow mb-1">How long episodes lasted</p><Spark data={I.minutesTrend ?? []} max={Math.max(10, ...(I.minutesTrend ?? [0]))} /></div>
                 {I.helped?.length > 0 && <div><p className="eyebrow">What helped most</p><div className="mt-1 flex flex-wrap gap-1.5">{I.helped.map((t: any) => <span key={t.name} className="tag tag-sage">{t.name} · {t.n}</span>)}</div></div>}
               </>
             )}
             {data && I.total > 0 && kind === "daily" && (
               <>
-                <div className="grid grid-cols-2 gap-2 text-center"><div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.avgMood}</p><p className="text-[12px] text-ink2">Avg mood (1 to 5)</p></div><div className="card-flat p-3"><p className="serif text-[1.8rem]">{I.avgAnxiety}</p><p className="text-[12px] text-ink2">Avg anxiety (0 to 10)</p></div></div>
+                <div className="grid grid-cols-2 gap-2 text-center"><div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.avgMood) || 0} decimals={1} /></p><p className="text-[12px] text-ink2">Avg mood (1 to 5)</p></div><div className="card-flat p-3"><p className="serif text-[1.8rem]"><Count to={Number(I.avgAnxiety) || 0} decimals={1} /></p><p className="text-[12px] text-ink2">Avg anxiety (0 to 10)</p></div></div>
                 <div><p className="eyebrow mb-1">Anxiety over time</p><Spark data={I.anxietyTrend ?? []} max={10} color="#B85D43" /></div>
                 {I.helped?.length > 0 && <div><p className="eyebrow">What helped most</p><div className="mt-1 flex flex-wrap gap-1.5">{I.helped.map((t: any) => <span key={t.name} className="tag tag-sage">{t.name} · {t.n}</span>)}</div></div>}
               </>

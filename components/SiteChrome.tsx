@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { useCalm } from "./Motion";
 import { applyMode, getMode, type Mode } from "./ThemeProvider";
 
 const I = (d: string) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden dangerouslySetInnerHTML={{ __html: d }} />;
@@ -63,27 +65,20 @@ export function Header() {
 
 export function Dock() {
   const path = usePathname();
-  const wrap = useRef<HTMLDivElement | null>(null);
-  const refs = useRef<Record<string, HTMLAnchorElement | null>>({});
-  const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
+  const calm = useCalm();
   const on = (h: string) => (h === "/" ? path === "/" : path.startsWith(h) || (h === "/now" && path.startsWith("/session")));
-  const active = NAV.find((n) => on(n.href))?.href ?? null;
-  useLayoutEffect(() => {
-    const place = () => { const el = active ? refs.current[active] : null; setPill(el ? { x: el.offsetLeft, w: el.offsetWidth } : null); };
-    place(); window.addEventListener("resize", place); return () => window.removeEventListener("resize", place);
-  }, [active, path]);
   if (HIDE.includes(path)) return null;
   return (
-    <nav aria-label="Main" className="fixed bottom-4 inset-x-0 z-40 flex justify-center pointer-events-none">
-      <div ref={wrap} className="dock pointer-events-auto relative flex items-center gap-1 p-1.5 rounded-full">
-        {pill && <span aria-hidden className="dock-pill absolute top-1.5 bottom-1.5 rounded-full" style={{ transform: `translateX(${pill.x}px)`, width: pill.w }} />}
+    <motion.nav aria-label="Main" className="fixed bottom-4 inset-x-0 z-40 flex justify-center pointer-events-none" initial={calm ? false : { y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 220, damping: 24, delay: 0.25 }}>
+      <div className="dock pointer-events-auto relative flex items-center gap-1 p-1.5 rounded-full">
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} ref={(el) => { refs.current[n.href] = el; }} aria-current={on(n.href) ? "page" : undefined} className={`dock-item relative z-10 inline-flex items-center gap-2 h-11 px-4 rounded-full text-[14px] font-medium ${on(n.href) ? "text-on-accent" : "text-ink2"}`}>
-            {n.icon}<span className={on(n.href) ? "" : "max-sm:hidden"}>{n.label}</span>
+          <Link key={n.href} href={n.href} aria-current={on(n.href) ? "page" : undefined} className={`dock-item relative inline-flex items-center gap-2 h-11 px-4 rounded-full text-[14px] font-medium ${on(n.href) ? "text-on-accent" : "text-ink2 hover:text-ink"}`}>
+            {on(n.href) && <motion.span layoutId="dock-pill" aria-hidden className="dock-pill absolute inset-0 rounded-full" transition={calm ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 32 }} />}
+            <motion.span className="relative z-10 inline-flex items-center gap-2" whileTap={calm ? undefined : { scale: 0.92 }}>{n.icon}<span className={on(n.href) ? "" : "max-sm:hidden"}>{n.label}</span></motion.span>
           </Link>
         ))}
       </div>
-    </nav>
+    </motion.nav>
   );
 }
 

@@ -45,7 +45,7 @@ function Now() {
   const order = conds.includes("ocd") ? ["intrusive", "panic", "overwhelm", "talk"] : ["panic", "intrusive", "overwhelm", "talk"];
 
   return (
-    <div className="space-y-6 fade-in">
+    <div className={session ? "space-y-6" : "max-w-[560px] mx-auto space-y-6"}>
       {!session && (
         <section className="max-w-[560px]"><h1>What's going on right now?</h1><p className="mt-1.5 text-ink2">Pick the closest one. You don't have to explain anything. <Link href="/voice" className="underline">Change Juno's voice</Link></p></section>
       )}
