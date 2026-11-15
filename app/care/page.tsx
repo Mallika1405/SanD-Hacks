@@ -33,7 +33,7 @@ export default function Care() {
   const [insurance, setInsurance] = useState("");
   const [comfort, setComfort] = useState<string[]>([]);
   const [res, setRes] = useState<any>(null);
-  const [tab, setTab] = useState<"therapists" | "groups">("therapists");
+  const [tab, setTab] = useState<"therapists" | "clinics" | "groups">("therapists");
   const [live, setLive] = useState("");
   const [working, setWorking] = useState(false);
   const [err, setErr] = useState("");
@@ -81,7 +81,7 @@ export default function Care() {
   async function run() {
     setErr(""); setMsg(""); setScript("");
     setTab(want === "group" ? "groups" : "therapists");
-    setRes({ specialties: [], providers: [], groups: [], directory: { listings: 0, last_checked: null } });
+    setRes({ specialties: [], providers: [], clinics: [], groups: [], directory: { listings: 0, last_checked: null } });
     setWorking(true); setLive("Starting…");
     setTimeout(() => top.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     try {
@@ -98,7 +98,7 @@ export default function Care() {
           const e = JSON.parse(line);
           if (e.type === "status") setLive(e.text);
           else if (e.type === "specialties") setRes((x: any) => ({ ...x, specialties: e.specialties }));
-          else if (e.type === "results") setRes((x: any) => ({ ...x, providers: e.providers, groups: e.groups, directory: e.directory }));
+          else if (e.type === "results") setRes((x: any) => ({ ...x, providers: e.providers, clinics: e.clinics ?? [], groups: e.groups, directory: e.directory }));
           else if (e.type === "error") setErr("Something went wrong while searching. What's shown may be incomplete.");
         }
       }
@@ -177,7 +177,7 @@ export default function Care() {
           {live && <p role="status" aria-live="polite" className="tag tag-sage !text-[12.5px] !py-1.5 w-fit">{working ? "● " : "✓ "}{live}</p>}
           {err && <p role="alert" className="text-terra text-[14.5px]">{err}</p>}
 
-          <div className="seg" role="tablist"><button aria-pressed={tab === "therapists"} onClick={() => setTab("therapists")}>Therapists ({res.providers.length})</button><button aria-pressed={tab === "groups"} onClick={() => setTab("groups")}>Support groups ({res.groups.length})</button></div>
+          <div className="seg" role="tablist"><button aria-pressed={tab === "therapists"} onClick={() => setTab("therapists")}>Therapists ({res.providers.length})</button>{(res.clinics?.length > 0 || coords) && <button aria-pressed={tab === "clinics"} onClick={() => setTab("clinics")}>Clinics ({res.clinics?.length ?? 0})</button>}<button aria-pressed={tab === "groups"} onClick={() => setTab("groups")}>Support groups ({res.groups.length})</button></div>
 
           {tab === "therapists" && (
             <div className="space-y-3">
@@ -192,7 +192,21 @@ export default function Care() {
                   <details className="text-[14px]"><summary className="cursor-pointer text-ink2 underline">What their page says</summary>
                     <div className="mt-2 space-y-1"><Field label="Insurance" text={p.insurance_text} /><Field label="Cost" text={p.cost_text} /><Field label="Availability" text={p.availability_text} />{p.quote && <p className="italic text-ink2">“{p.quote}”</p>}
                       <p className="text-[12.5px] text-ink2">Unverified. Source: <a className="underline" target="_blank" rel="noreferrer" href={p.source_url}>{host(p.source_url)}</a> · checked {ago(p.checked_at)}</p></div></details>
-                  <div className="flex flex-wrap gap-2 pt-1">{p.url && <a href={p.url} target="_blank" rel="noreferrer" className="b b-primary">Open their page</a>}<button onClick={() => makeScript(p.name)} className="b b-soft border border-line">Write my message</button></div>
+                  <div className="flex flex-wrap gap-2 pt-1">{p.url && <a href={p.url} target="_blank" rel="noreferrer" className="b b-primary">Open their page</a>}{p.phone && <a href={`tel:${p.phone}`} className="b b-soft border border-line">{p.phone}</a>}<button onClick={() => makeScript(p.name)} className="b b-soft border border-line">Write my message</button></div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {tab === "clinics" && (
+            <div className="space-y-3">
+              {(res.clinics ?? []).length === 0 && <p className="card-flat p-5 text-ink2">{working ? "Checking Google Maps…" : "No clinics found within that distance. Try a wider radius."}</p>}
+              {(res.clinics ?? []).map((p: any) => (
+                <article key={p.id} className="card p-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2"><h3 className="!text-[1.15rem]">{p.name}</h3>{p.specialties?.[0] && <span className="tag tag-stone">{p.specialties[0]}</span>}{p.rating != null && <span className="tag tag-sage">★ {p.rating}{p.rating_count ? ` (${p.rating_count})` : ""}</span>}</div>
+                  <p className="text-[13.5px] text-ink2">{p.distance_mi} mi away{p.address ? ` · ${p.address}` : ""}</p>
+                  <p className="text-[12.5px] text-ink2">From Google Maps. Not verified by us, so confirm that they treat what you need and take your insurance.</p>
+                  <div className="flex flex-wrap gap-2 pt-1">{p.url && <a href={p.url} target="_blank" rel="noreferrer" className="b b-primary">Website</a>}{p.phone && <a href={`tel:${p.phone}`} className="b b-soft border border-line">{p.phone}</a>}<a href={p.source_url} target="_blank" rel="noreferrer" className="b b-ghost">Directions</a></div>
                 </article>
               ))}
             </div>

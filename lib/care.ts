@@ -1,6 +1,7 @@
 import { q } from "./db";
 import { gemini } from "./gemini";
 import { brightEnabled, serpLinks, unlock } from "./brightdata";
+import { placesEnabled, placesSearch } from "./places";
 
 /* ---------------------------------------------------------------- discovery (Bright Data -> Gemini -> Neon) */
 
@@ -85,8 +86,9 @@ export async function discover(city: string, opts: { maxPages?: number; log?: (s
 
 /* ---------------------------------------------------------------- distance */
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-/** Public business addresses and city names only (never the person's own location) go to OpenStreetMap's free geocoder. */
+/** Google Places first (accurate), OpenStreetMap as the fallback. Only public business addresses and city names are sent, never the person's own position. */
 export async function geocode(text: string): Promise<{ lat: number; lng: number } | null> {
+  if (placesEnabled()) { const [p] = await placesSearch(text, { max: 1 }); if (p?.lat != null && p.lng != null) return { lat: p.lat, lng: p.lng }; }
   try {
     const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(text)}`, { headers: { "User-Agent": "somewhere-demo" }, signal: AbortSignal.timeout(6000) });
     const j = await r.json();
@@ -108,12 +110,38 @@ export async function geocodePending(max = 8) {
   for (const r of rows) {
     const key = String(r.address).toLowerCase().replace(/\s+/g, " ").trim();
     let g = seen.has(key) ? seen.get(key)! : await geocode(cleanAddr(r.address));
-    if (!g && !seen.has(key)) { const z = cityZip(r.address); if (z) { await sleep(1100); g = await geocode(z); } }
+    if (!g && !seen.has(key)) { const z = cityZip(r.address); if (z) { if (!placesEnabled()) await sleep(1100); g = await geocode(z); } }
     const fresh = !seen.has(key); seen.set(key, g);
     await q("UPDATE providers SET lat=$2, lng=$3, geo_tried=true WHERE id=$1", [r.id, g?.lat ?? null, g?.lng ?? null]);
-    if (fresh) await sleep(1100);
+    if (fresh && !placesEnabled()) await sleep(1100);
   }
   return rows.length;
+}
+
+
+/** Real practices near a point from Google Maps, plus addresses for therapists who only name their clinic. */
+export async function placesDiscover(a: Answers, specs: { name: string }[]) {
+  if (!placesEnabled() || a.lat == null || a.lng == null) return 0;
+  const topic = (a.goals[0] ?? "anxiety").toLowerCase();
+  const qs = [`therapist for ${topic}`, `counseling and psychotherapy ${specs[0]?.name ?? "anxiety"}`, "mental health clinic anxiety"];
+  let n = 0;
+  for (const qq of qs) {
+    for (const p of await placesSearch(qq, { lat: a.lat, lng: a.lng, radiusMi: a.radius ?? 25, max: 10 })) {
+      if (!p.name || !p.mapsUri) continue;
+      await q(`INSERT INTO providers(name,kind,specialties,modalities,location,telehealth,url,source_url,checked_at,verified,confidence,is_individual,clinic,address,lat,lng,phone,rating,rating_count,place_id,geo_tried,notes)
+        VALUES ($1,'clinic',$2,'{}',$3,NULL,$4,$5,now(),false,0.5,false,$1,$3,$6,$7,$8,$9,$10,$11,true,'Listed on Google Maps')
+        ON CONFLICT (source_url,name) DO UPDATE SET address=$3,lat=$6,lng=$7,phone=$8,rating=$9,rating_count=$10,url=$4,checked_at=now()`,
+        [p.name.slice(0, 160), p.type ? [p.type] : [], p.address, p.website, p.mapsUri, p.lat, p.lng, p.phone, p.rating, p.ratings, p.id]);
+      n++;
+    }
+  }
+  // Therapists who named a clinic but gave no address: look the clinic up.
+  const need = await q<any>("SELECT id, clinic FROM providers WHERE is_individual AND clinic IS NOT NULL AND address IS NULL AND lat IS NULL AND geo_tried = false ORDER BY checked_at DESC LIMIT 8");
+  for (const r of need) {
+    const [p] = await placesSearch(`${r.clinic} ${a.city}`, { lat: a.lat, lng: a.lng, radiusMi: 50, max: 1 });
+    await q("UPDATE providers SET address=COALESCE($2,address), lat=$3, lng=$4, phone=COALESCE($5,phone), geo_tried=true WHERE id=$1", [r.id, p?.address ?? null, p?.lat ?? null, p?.lng ?? null, p?.phone ?? null]);
+  }
+  return n;
 }
 
 /* ---------------------------------------------------------------- matching (cache only) */
@@ -190,6 +218,10 @@ export async function rank(answers: Answers, specialties: Spec[]) {
     // Near me: closest first, listings without a known distance last.
     .sort((a: any, b: any) => (answers.lat != null ? (a.distance_mi ?? 1e6) - (b.distance_mi ?? 1e6) : 0));
 
+  const clinics = answers.lat == null ? [] : prov.filter((p: any) => !p.is_individual && p.lat != null)
+    .map((p: any) => ({ ...p, insurance_match: false, distance_mi: Math.round(miles({ lat: answers.lat!, lng: answers.lng! }, { lat: p.lat, lng: p.lng }) * 10) / 10 }))
+    .filter((p: any) => !answers.radius || p.distance_mi <= answers.radius).sort((a: any, b: any) => a.distance_mi - b.distance_mi).slice(0, 10);
+
   const groups = grp.map((g: any) => {
     const t = hay(g.name, g.topics, g.notes, g.quote);
     const specHits = terms.filter((x) => t.includes(x)).length;
@@ -201,7 +233,7 @@ export async function rank(answers: Answers, specialties: Spec[]) {
 
   const [stat] = await q<{ n: number; last: string }>(`SELECT (SELECT count(*) FROM providers)::int + (SELECT count(*) FROM groups)::int AS n,
     GREATEST((SELECT max(checked_at) FROM providers), (SELECT max(checked_at) FROM groups)) AS last`);
-  return { providers: m.includes("therapy") || m.includes("psychiatry") || m.includes("low_cost") ? providers : [], groups: m.includes("groups") ? groups : [], directory: { listings: stat?.n ?? 0, last_checked: stat?.last ?? null } };
+  return { clinics, providers: m.includes("therapy") || m.includes("psychiatry") || m.includes("low_cost") ? providers : [], groups: m.includes("groups") ? groups : [], directory: { listings: stat?.n ?? 0, last_checked: stat?.last ?? null } };
 }
 
 export async function search(answers: Answers, flows: string[]) {
@@ -258,6 +290,7 @@ export async function liveDiscover(answers: Answers, specs: Spec[], emit: (e: an
   const recent = new Set((await q<{ source_url: string }>(`SELECT source_url FROM providers WHERE checked_at > now() - interval '12 hours' UNION SELECT source_url FROM groups WHERE checked_at > now() - interval '12 hours'`)).map((r) => r.source_url));
   const todo = urls.filter((u) => !recent.has(u)).slice(0, 12);
   emit({ type: "status", text: `Found ${urls.length} pages${urls.length - todo.length ? ` (${urls.length - todo.length} checked recently)` : ""}. Reading ${todo.length} now…` });
+  if (placesEnabled() && answers.lat != null) { emit({ type: "status", text: "Checking Google Maps for practices near you…" }); await placesDiscover(answers, specs); }
   emit({ type: "results", ...(await rank(answers, specs)) });
 
   let done = 0, queue = [...todo];
