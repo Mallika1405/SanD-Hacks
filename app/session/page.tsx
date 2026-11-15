@@ -217,6 +217,10 @@ function Session() {
     try { await navigator.clipboard.writeText(TRUST_MSG); flash("Copied. Paste it to someone you trust."); } catch { flash(TRUST_MSG); }
   };
   const say = (t: string) => handleUser(t);
+  const consentCheckin = async () => {
+    await fetch("/api/checkins", { method: "POST", body: JSON.stringify({ sessionId, hour: new Date().getHours() }) }).catch(() => {});
+    flash("Okay. I'll check in tomorrow, and remember what helped today.");
+  };
 
   if (!sessionId) return null;
   const done = ui.done;
@@ -244,23 +248,13 @@ function Session() {
         {!sttOk && <p role="status" className="text-center text-amber text-sm">I can't hear you in this browser. Use the buttons below instead, or open this in Chrome.</p>}
       </div>
 
-      {ui.rate && !done && (
-        <div role="group" aria-label="How intense is it, from one to ten" className="grid grid-cols-5 gap-2 mb-3">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => <button key={n} onClick={() => say(String(n))} className="min-h-12 rounded-xl bg-surface text-lg text-ink">{n}</button>)}
-        </div>
-      )}
       {ui.finish && !done && (
         <div className="grid grid-cols-1 gap-2 mb-3">
-          <button onClick={() => say("keep going")} className="min-h-14 rounded-2xl bg-surface text-lg">Keep going</button>
-          <button onClick={() => say("stop")} className="min-h-14 rounded-2xl bg-surface text-lg">Stop here</button>
+          <button onClick={() => say("keep going")} className="min-h-14 rounded-2xl bg-accent text-ground text-lg font-semibold">Keep going with me</button>
           <button onClick={share} className="min-h-14 rounded-2xl bg-surface text-lg">Message someone I trust</button>
-        </div>
-      )}
-      {ui.followup && !done && (
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <button onClick={() => say("yes")} className="min-h-14 rounded-2xl bg-accent text-ground font-semibold">Yes, check in tomorrow</button>
-          <button onClick={() => say("no")} className="min-h-14 rounded-2xl bg-surface">No thanks</button>
-          {ui.suggestCare && <a href="/care" className="col-span-2 min-h-14 rounded-2xl bg-surface flex items-center justify-center text-teal">When you're ready: find support near you</a>}
+          <button onClick={consentCheckin} className="min-h-14 rounded-2xl bg-surface text-lg">Check in with me tomorrow</button>
+          {ui.suggestCare && <a href="/care" className="min-h-14 rounded-2xl bg-surface flex items-center justify-center text-teal text-lg">Find support near you</a>}
+          <button onClick={() => router.push("/")} className="min-h-14 rounded-2xl text-muted underline">I'm done</button>
         </div>
       )}
       {ui.trusted && <button onClick={share} className="mb-3 min-h-14 rounded-2xl bg-teal text-ground font-bold text-lg">Send my message to someone I trust</button>}
@@ -273,14 +267,14 @@ function Session() {
 
       {!done && (
         <>
-          <div className="flex justify-center gap-2 mb-3" role="group" aria-label="Quick replies">
+          {!ui.finish && <div className="flex justify-center gap-2 mb-3" role="group" aria-label="Quick replies">
             {[["Slower", "slower"], ["Something else", "something else"], ["That helped", "that helped"]].map(([l, v]) => (
               <button key={v} onClick={() => say(v)} className="px-4 min-h-12 rounded-full bg-surface text-sm text-ink">{l}</button>
             ))}
-          </div>
+          </div>}
           <div className="grid grid-cols-2 gap-3 pb-2">
-            <button onClick={togglePause} className="min-h-16 rounded-2xl bg-surface text-lg">{paused ? "Resume" : "Pause"}</button>
-            <button onClick={okayNow} className="min-h-16 rounded-2xl bg-surface text-lg">I'm okay now</button>
+            {!ui.finish && <button onClick={togglePause} className="min-h-16 rounded-2xl bg-surface text-lg">{paused ? "Resume" : "Pause"}</button>}
+            {!ui.finish && <button onClick={okayNow} className="min-h-16 rounded-2xl bg-surface text-lg">I'm okay now</button>}
             <button onClick={helpNow} className="col-span-2 min-h-16 rounded-2xl bg-coral text-ground text-lg font-bold">I need help now</button>
           </div>
         </>

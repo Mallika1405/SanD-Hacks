@@ -21,7 +21,7 @@ export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").r
 
 const SYSTEM = `You turn ONE public health web page into short, self-guided calming techniques that a person can follow by listening, for someone who is distressed right now.
 Return JSON {"techniques":[{"title":string,"duration_s":number,"steps":[{"text":string,"pause_ms":number,"listen":boolean}],"quote":string}]}.
-RULES: Use ONLY techniques the page itself describes (breathing, grounding, muscle relaxation, orienting, etc). At most 3 techniques. Each has 5 to 9 steps. Each step is ONE short spoken sentence (max 14 words), second person, calm, no jargon.
+RULES: Use ONLY techniques the page itself describes (breathing, grounding, muscle relaxation, orienting, etc). At most 3 techniques. Each has 5 to 9 steps. Each step is ONE short spoken sentence (max 14 words), second person, calm, no jargon. Write DIRECT INSTRUCTIONS (imperative: "Put your feet on the floor."). NEVER write a question and never ask the person to choose or answer anything.
 pause_ms is the silence after the step (1500 to 7000; longer when the person has to do something). listen=true only when the person is asked to name or say something.
 Do NOT include medication, doses, diagnosis, promises that it will stop or cure anything, or techniques that need a clinician. Do NOT include "calm down" or "relax". If the page has no such technique return {"techniques":[]}. quote = a short phrase (max 140 chars) copied from the page.`;
 
@@ -32,7 +32,7 @@ type Raw = { title?: string; duration_s?: number; steps?: { text?: string; pause
 function clean(t: Raw) {
   if (!t.title || !Array.isArray(t.steps)) return null;
   const steps = t.steps.map((s) => ({ text: String(s.text ?? "").trim().slice(0, 130), pause_ms: Math.max(1200, Math.min(8000, Number(s.pause_ms) || 2500)), ...(s.listen ? { listen: true } : {}) })).filter((s) => s.text);
-  if (steps.length < 4 || steps.length > 10 || steps.some((s) => BAD_STEP.test(s.text))) return null;
+  if (steps.length < 4 || steps.length > 10 || steps.some((s) => BAD_STEP.test(s.text) || s.text.includes("?"))) return null;
   return { title: String(t.title).slice(0, 80), duration_s: Math.round(Number(t.duration_s) || steps.reduce((a, s) => a + s.pause_ms / 1000 + 3, 0)), steps, quote: t.quote ? String(t.quote).slice(0, 160) : null };
 }
 
@@ -83,6 +83,6 @@ export async function listSourced(key: string): Promise<Sourced[]> {
   const rows = await q<any>("SELECT * FROM techniques WHERE situation_key=$1 ORDER BY checked_at DESC LIMIT 8", [key]);
   return rows.map((r) => ({
     id: `src:${r.id}`, db_id: r.id, title: r.title, flows: [r.flow], status: "needs human review" as const, source_url: r.source_url, source_name: r.source_name,
-    segments: [{ text: "Let's go through this together, one step at a time.", pause_ms: 1500 }, ...(r.steps as any[])].map((s) => ({ text: s.text, pause_ms: s.pause_ms, ...(s.listen ? { listen: true } : {}) })),
+    segments: [{ text: "Do exactly what I say, one step at a time.", pause_ms: 1500 }, ...(r.steps as any[])].map((s) => ({ text: s.text, pause_ms: s.pause_ms, ...(s.listen ? { listen: true } : {}) })),
   }));
 }

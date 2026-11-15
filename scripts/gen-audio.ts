@@ -8,13 +8,13 @@ import { fbKey } from "../lib/speech";
 import { DEFAULT_VOICE } from "../lib/voices";
 
 // Pre-generates fallback audio (default preset voice) so the demo works if the live voice path fails.
-const CORE = ["breathe-paced", "ground-54321", "intr-notice"];
+const CORE = ["orient-posture", "exhale-breath", "name-it", "ground-54321", "intr-notice"];
 const texts = new Set<string>([
-  "I'm here with you. We'll go slowly.", "I'm here with you.", "Thank you. Let's do this together.",
-  "What's it like right now? You can say panic, a thought that won't leave, or that it's all a lot.",
-  "Would you like to keep going, or stop here?", "Would you like to keep going, or try something different?",
-  "You stayed with it. That counts.", "Would you like to keep going, stop here, or send a message to someone you trust?",
-  "Okay. Let's try something else.", "Thank you for telling me. Let's try something different.", "Okay. Slower.",
+  "Good. Stay with me.", "Well done. Next step.", "Keep going. You're doing this.", "Good. Let's keep moving.", "That's it. Next.",
+  "Okay. Slower.", "Okay. Let's change it. Follow my voice.", "Good. Stay with it.", "Okay. Let's continue. Follow my voice.",
+  "I'm glad you're safe right now. Stay with me. We'll go slowly.",
+  "You've done well. Stay here a little longer.", "Keep your feet on the floor, and keep your breathing slow.", "When you're ready, drink some water.",
+  "If this has lasted much longer than twenty minutes, or you have chest pain, call 911. If you feel unsafe, call or text 988.",
   ...CRISIS_SEGS.map((s) => s.text), ...MEDICAL_SEGS.map((s) => s.text), ...SAFETY_QUESTION.map((s) => s.text),
   ...EXERCISES.filter((e) => CORE.includes(e.id)).flatMap((e) => e.segments.map((s) => s.text)),
 ]);
