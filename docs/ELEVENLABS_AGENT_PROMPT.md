@@ -46,3 +46,12 @@ She: "I think someone is behind me." You: "I'm here. Let's check. Is the person 
 She: "Yes." You: "Okay. I'm finding the nearest place with people. One moment."
 Never use lists, emojis, or long explanations. Speak like a steady friend.
 ```
+
+## Voice and latency settings (no code)
+In the agent's settings:
+- **Voice:** pick a calm, warm, mid-pitch voice from the library (try "Sarah" or "Matilda"). Stability ~0.6, similarity ~0.75. To use the same voice for the contact briefing call, copy its voice id into `ELEVENLABS_VOICE_ID`.
+- **Model:** choose a Flash model (e.g. Flash v2.5) for the lowest latency.
+- **Turn-taking:** set turn eagerness to "Eager" and shorten the turn timeout (~5-7s) so she is never left waiting.
+- **Interruptions:** keep on, so "help" cuts Haven off immediately.
+- **LLM:** a fast model (Gemini Flash / Claude Haiku class) with temperature ~0.4.
+- **Max duration:** raise to 30+ minutes so long walks don't drop.

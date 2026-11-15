@@ -1,5 +1,6 @@
 import { q } from "@/lib/db";
 import { briefing, Alert } from "@/lib/alerts";
+import { briefingAudio } from "@/lib/tts";
 import { formParams, verifyTwilio, twiml, VoiceResponse, baseUrl } from "@/lib/twilio";
 
 export async function POST(req: Request) {
@@ -17,9 +18,12 @@ export async function POST(req: Request) {
   else {
     const g = vr.gather({ numDigits: 1, timeout: 8, action: `${baseUrl()}/api/twilio/gather?callId=${callId}`, method: "POST" });
     const text = await briefing(alert);
-    g.say(text);
+    // Natural ElevenLabs voice if available; otherwise Twilio's built-in voice.
+    const ok = await briefingAudio(alert.id, text);
+    const say = () => (ok ? g.play(`${baseUrl()}/api/twilio/briefing?alertId=${alert.id}`) : g.say(text));
+    say();
     g.pause({ length: 1 });
-    g.say(text);
+    say();
     vr.say("No response received. Goodbye.");
   }
   vr.hangup();

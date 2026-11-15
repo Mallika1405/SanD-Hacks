@@ -18,7 +18,7 @@ Set `SEED_PHONE_1..3` to real numbers before `npm run seed` for live calls.
 |---|---|
 | `DATABASE_URL` | Neon Postgres |
 | `TWILIO_*`, `APP_BASE_URL` | calls/SMS. Webhook base must be public https (ngrok or Vercel). Set the number's SMS webhook to `/api/twilio/sms` |
-| `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` | voice agent. Prompt + tools: `docs/ELEVENLABS_AGENT_PROMPT.md` |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_VOICE_ID` (optional) | voice agent + the spoken briefing contacts hear on the alert call. Prompt + tools: `docs/ELEVENLABS_AGENT_PROMPT.md` |
 | `GEMINI_API_KEY` | extraction of hours, evidence chips |
 | `BRIGHTDATA_*` | venue page + SERP fetch |
 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | optional: Places + Directions. Without it: Overpass + OSM foot routing. Map tiles are MapLibre either way |
