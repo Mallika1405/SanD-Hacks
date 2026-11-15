@@ -116,7 +116,7 @@ function Session() {
     if (out.exerciseTitle) setTitle(out.exerciseTitle);
     setUi(out.ui);
     if (out.ui.crisis) setCrisis(out.ui.crisis);
-    if (out.ui.checkinConsent) fetch("/api/checkins", { method: "POST", body: JSON.stringify({}) }).catch(() => {});
+    if (out.ui.checkinConsent) fetch("/api/checkins", { method: "POST", body: JSON.stringify({ sessionId, hour: new Date().getHours() }) }).catch(() => {});
     const finished = await play(out);
     if (finished && out.state === "support" && out.lead < out.say.length) {
       const next = await turnCall({ event: "segments_done" });

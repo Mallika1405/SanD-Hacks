@@ -1,13 +1,14 @@
 import { q } from "./db";
 import { gemini } from "./gemini";
 import { assessSafety, CRISIS_SEGS, MEDICAL_SEGS, SAFETY_QUESTION } from "./safety";
-import { BY_FLOW, Flow, getExercise } from "./exercises";
+import { BY_FLOW, Flow as ExerciseFlow, getExercise } from "./exercises";
+type Flow = ExerciseFlow | "checkin";
 import { out, OutSeg, Seg } from "./speech";
 
 export type State = "start" | "support" | "adapt" | "finish" | "followup" | "crisis";
-type Pending = "flow" | "safety" | "continue" | "finish_choice" | "checkin";
+type Pending = "flow" | "safety" | "continue" | "finish_choice" | "checkin" | "checkin_reply";
 type Ctx = {
-  exId?: string; tried: string[]; helped: string[]; worse: string[]; slow?: boolean; pending?: Pending;
+  exId?: string; checkinId?: string; tried: string[]; helped: string[]; worse: string[]; slow?: boolean; pending?: Pending;
   resumeIdx?: number; recent: { r: "u" | "a"; t: string }[]; turns: number;
 };
 export type TurnInput = {
@@ -36,7 +37,7 @@ export function intent(text: string): Intent {
   return "talk";
 }
 
-function detectFlow(t: string): Exclude<Flow, "unsure"> | null {
+function detectFlow(t: string): Exclude<ExerciseFlow, "unsure"> | null {
   const n = norm(t);
   if (/(thought|thinking|what if|stuck|can't stop|cant stop|intrusive|obsess|loop|checking|replaying)/.test(n)) return "intrusive";
   if (/(panic|attack|heart|racing|pounding|scared|terrified|can't calm)/.test(n)) return "panic";
@@ -74,14 +75,14 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   const text = input.text?.trim() || "";
   if (text) { ctx.recent.push({ r: "u", t: text.slice(0, 300) }); ctx.turns++; }
 
-  const pick = (f: Exclude<Flow, "unsure">) => {
+  const pick = (f: Exclude<ExerciseFlow, "unsure">) => {
     let order = BY_FLOW[f].filter((id) => !ctx.tried.includes(id) && !ctx.worse.includes(id));
     if (!order.length) { ctx.tried = []; order = BY_FLOW[f].filter((id) => !ctx.worse.includes(id)); }
     if (!order.length) order = BY_FLOW[f];
     return favorite && order.includes(favorite) ? favorite : order[0];
   };
   const begin = (leadSegs: Seg[] = []) => {
-    const f = (flow === "unsure" ? "overwhelm" : flow) as Exclude<Flow, "unsure">;
+    const f = (flow === "unsure" || flow === "checkin" ? "overwhelm" : flow) as Exclude<ExerciseFlow, "unsure">;
     const id = pick(f); const ex = getExercise(id);
     ctx.exId = id; ctx.tried.push(id); ctx.pending = undefined; ctx.resumeIdx = undefined; state = "support";
     say = [...leadSegs, ...ex.segments.map((s) => ({ ...s }))]; lead = leadSegs.length; exBase = 0;
@@ -137,7 +138,16 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
         say = text ? [S("I'm here. Please call or text 988 now. The number is on your screen.", 500)] : [];
       }
     } else if (input.event === "help_now") crisis("self_harm");
-    else if (input.event === "start") {
+    else if (input.event === "start" && flow === "checkin") {
+      if (ctx.checkinId) await q("UPDATE checkins SET done_at=now() WHERE id=$1 AND device_id=$2", [ctx.checkinId, deviceId]);
+      const helped = favorite ? getExercise(favorite).title.toLowerCase() : null;
+      const g = await gemini<{ say: string }>(
+        `Write ONE short, warm check-in sentence (max 20 words) for someone who asked to be checked on. No pressure, no advice. ${helped ? `Something that helped them before (they agreed to be remembered): ${helped}.` : ""} ${pr?.prefers?.hard_times ? `They said ${pr.prefers.hard_times} can be harder.` : ""} Reply JSON {"say":"..."}`,
+        true, { timeoutMs: 4000 });
+      const line = g?.say && !BANNED.test(g.say) && g.say.split(/\s+/).length <= 30 ? g.say.trim() : "Hi. It's Somewhere, checking in like you asked.";
+      ctx.pending = "checkin_reply"; state = "start";
+      say = [S(line, 600), S("How are you doing right now?", 400, true)];
+    } else if (input.event === "start") {
       if (flow === "unsure") { ctx.pending = "flow"; say = [S("I'm here with you.", 700), S("What's it like right now? You can say panic, a thought that won't leave, or that it's all a lot.", 400, true)]; }
       else begin([S("I'm here with you. We'll go slowly.", 700)]);
     } else if (input.event === "okay_now") finish();
@@ -147,7 +157,14 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
     } else if (text) {
       const i = intent(text);
       const resumeAt = (input.spoken_idx ?? -1) + (input.interrupted ? 0 : 1);
-      if (ctx.pending === "flow") {
+      if (ctx.pending === "checkin_reply") {
+        const n = norm(text);
+        const neg = /(not good|not great|not okay|not ok|bad|anxious|rough|hard|worse|tough|stress|panic|scared|overwhelm|struggl|tired|awful|terrible|can't|cant)/.test(n);
+        const pos = /\b(good|fine|okay|ok|better|great|well|alright|calm)\b/.test(n);
+        if (neg) { flow = detectFlow(text) ?? "overwhelm"; begin([S("Thank you for telling me. Let's try something together.", 700)]); }
+        else if (pos) { ctx.pending = undefined; ui.done = true; say = [S("I'm glad to hear that. I'm here whenever you need me.", 500)]; }
+        else { const reply = await freeTalk("overwhelm", text, ctx.recent); ctx.pending = "continue"; state = "adapt"; say = [S(reply, 700), S("Would you like to try something together, or stop here?", 400, true)]; }
+      } else if (ctx.pending === "flow") {
         const f = detectFlow(text) ?? (await gemini<{ flow: string }>(`Which best fits? panic, intrusive (unwanted repeating thoughts), or overwhelm. Text: "${text.slice(0, 300)}". JSON {"flow":"..."}`, true, { timeoutMs: 3000 }))?.flow;
         flow = (["panic", "intrusive", "overwhelm"].includes(f as string) ? f : "overwhelm") as Flow;
         begin([S("Thank you. Let's do this together.", 600)]);
@@ -204,5 +221,5 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
     [sessionId, state, JSON.stringify(ctx), flow, ctx.helped, ended, `${flow}; tried ${ctx.tried.join(", ") || "none"}; helped ${ctx.helped.join(", ") || "none"}`]);
 
   if (lead < 0) lead = say.length;
-  return { say: out(say, ctx.slow), lead, exBase, state, flow, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui };
+  return { say: out(say, ctx.slow), lead, exBase, state, flow: flow as any, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui };
 }

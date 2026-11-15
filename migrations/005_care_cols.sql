@@ -1,0 +1,4 @@
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS notes text;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS quote text;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS notes text;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS quote text

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const FLOWS = [
@@ -13,6 +13,16 @@ export default function Home() {
   const [flow, setFlow] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [due, setDue] = useState<{ id: string } | null>(null);
+  useEffect(() => { fetch("/api/checkins/due").then((r) => r.json()).then((j) => setDue(j.due)).catch(() => {}); }, []);
+
+  async function startCheckin() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/sos/start", { method: "POST", body: JSON.stringify({ flow: "checkin", checkinId: due!.id }) });
+      const s = await res.json(); r.push(`/session?id=${s.id}`);
+    } catch { setErr("I couldn't start. Please try again."); setBusy(false); }
+  }
 
   async function start() {
     setBusy(true); setErr("");
@@ -30,9 +40,17 @@ export default function Home() {
         <h1 className="text-2xl font-semibold tracking-tight">somewhere.</h1>
         <nav className="flex gap-1 text-sm">
           <a href="/voice" className="px-3 min-h-12 inline-flex items-center rounded-full bg-surface text-ink">Voice</a>
+          <a href="/care" className="px-3 min-h-12 inline-flex items-center text-muted">Support</a>
           <a href="/me" className="px-3 min-h-12 inline-flex items-center text-muted">You</a>
         </nav>
       </header>
+
+      {due && (
+        <section aria-label="Check-in" className="mt-4 bg-surface rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div><p className="font-medium">You asked me to check in.</p><p className="text-sm text-muted">Takes about a minute. Skip it any time.</p></div>
+          <button disabled={busy} onClick={startCheckin} className="px-4 min-h-12 rounded-xl bg-accent text-ground font-semibold disabled:opacity-50">Talk</button>
+        </section>
+      )}
 
       <section className="flex-1 flex flex-col justify-center gap-6 py-8">
         <div className="orb paused" aria-hidden />

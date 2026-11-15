@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   let allowed = PRESETS.some((p) => p.id === v);
   if (!allowed && /^[A-Za-z0-9]{10,40}$/.test(v)) {
     const dev = await currentDevice();
-    if (dev) { const [r] = await q<{ voice_id: string }>("SELECT voice_id FROM preferences WHERE device_id=$1", [dev]); allowed = r?.voice_id === v; }
+    if (dev) { const [r] = await q<{ voice_id: string; clone_voice_id: string }>("SELECT voice_id, clone_voice_id FROM preferences WHERE device_id=$1", [dev]); allowed = r?.voice_id === v || r?.clone_voice_id === v; }
   }
   if (!allowed) return new Response("voice not allowed", { status: 403 });
   if (!process.env.ELEVENLABS_API_KEY) return new Response("tts not configured", { status: 503 });
