@@ -67,7 +67,7 @@ export default function You() {
           <Seg label="How much on screen" value={s.focus} opts={[["single", "Just what matters now"], ["balanced", "A bit more"]]} onPick={(v) => change("focus", v)} />
           <Seg label="Text size" value={String(s.fontScale <= 0.99 ? 0.95 : s.fontScale < 1.08 ? 1 : s.fontScale < 1.15 ? 1.1 : 1.2)} opts={[["0.95", "Small"], ["1", "Medium"], ["1.1", "Large"], ["1.2", "Larger"]]} onPick={(v) => change("fontScale", Number(v))} />
           <Seg label="Contrast" value={s.contrast} opts={[["normal", "Soft"], ["high", "High"]]} onPick={(v) => change("contrast", v)} />
-          <div><p className="text-[13.5px] text-ink2 mb-1.5">Color mood</p><div className="flex gap-2">{PAL.map(([k, l, c]) => <button key={k} aria-pressed={s.palette === k} onClick={() => change("palette", k)} className="chip"><i className="size-3.5 rounded-full" style={{ background: c }} />{l}</button>)}</div></div>
+          <div><p className="text-[13.5px] text-ink2 mb-1.5">Color mood <span className="text-ink2/80">(blues and greens are most often linked with calm, but no color is proven to calm a particular condition. Pick what feels good to you.)</span></p><div className="flex gap-2">{PAL.map(([k, l, c]) => <button key={k} aria-pressed={s.palette === k} onClick={() => change("palette", k)} className="chip"><i className="size-3.5 rounded-full" style={{ background: c }} />{l}</button>)}</div></div>
           <button onClick={resetUi} className="text-[13.5px] underline text-ink2">Reset to recommended</button>
         </div>
         {ui.why.rationale.length > 0 && (

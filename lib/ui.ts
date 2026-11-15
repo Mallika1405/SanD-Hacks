@@ -13,9 +13,9 @@ export const BASE: UiSettings = { density: "cozy", motion: "soft", palette: "sag
 export const DEFAULTS: Record<string, { settings: UiSettings; rationale: string[] }> = {
   ocd: { settings: { density: "cozy", motion: "none", palette: "slate", fontScale: 1, focus: "single", contrast: "normal" }, rationale: ["Predictable, unchanging screens reduce the pull to check and re-check.", "One clear thing at a time means fewer decisions to second-guess.", "No animation keeps attention from getting caught on moving details."] },
   panic: { settings: { density: "airy", motion: "soft", palette: "sage", fontScale: 1.1, focus: "single", contrast: "high" }, rationale: ["Larger text and high contrast stay readable when vision narrows or hands shake.", "A single focus keeps the next step obvious in a hard moment.", "Gentle motion can pace breathing without feeling busy."] },
-  gad: { settings: { density: "airy", motion: "soft", palette: "sand", fontScale: 1, focus: "single", contrast: "normal" }, rationale: ["Fewer things on screen gives a busy mind less to latch onto.", "Warm, muted color feels less stimulating than bright color."] },
-  social: { settings: { density: "cozy", motion: "soft", palette: "mist", fontScale: 1, focus: "balanced", contrast: "normal" }, rationale: ["A soft, low-pressure look avoids feeling evaluated.", "Plain, friendly wording and no countdowns or streaks keep the pressure off."] },
-  overwhelm: { settings: { density: "airy", motion: "none", palette: "mist", fontScale: 1.05, focus: "single", contrast: "normal" }, rationale: ["Lots of white space and no motion lowers sensory load.", "Showing only what matters now prevents overload."] },
+  gad: { settings: { density: "airy", motion: "soft", palette: "sage", fontScale: 1, focus: "single", contrast: "normal" }, rationale: ["Fewer things on screen gives a busy mind less to latch onto.", "Warm, muted color feels less stimulating than bright color."] },
+  social: { settings: { density: "cozy", motion: "soft", palette: "slate", fontScale: 1, focus: "balanced", contrast: "normal" }, rationale: ["A soft, low-pressure look avoids feeling evaluated.", "Plain, friendly wording and no countdowns or streaks keep the pressure off."] },
+  overwhelm: { settings: { density: "airy", motion: "none", palette: "sage", fontScale: 1.05, focus: "single", contrast: "normal" }, rationale: ["Lots of white space and no motion lowers sensory load.", "Showing only what matters now prevents overload."] },
   other: { settings: { ...BASE }, rationale: ["A calm, balanced default."] },
 };
 
