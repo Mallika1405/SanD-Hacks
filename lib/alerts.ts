@@ -47,7 +47,7 @@ async function userName(userId: string) {
 export async function briefing(alert: Alert) {
   const name = await userName(alert.user_id);
   const where = alert.place_text ? ` at ${alert.place_text}` : "";
-  return `${name} asked for help${where}. Press 1 to say you are responding. If this is an emergency, call 9 1 1.`;
+  return `This is Haven, a safety app. ${name} just asked her emergency contacts for help${where}. She may need someone. If you can respond, press 1 now. If this is an emergency, call 9 1 1.`;
 }
 
 export function responderLink(alert: Alert, contactId?: string) {
@@ -78,7 +78,7 @@ async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[])
         await q("UPDATE alert_calls SET status='blocked', updated_at=now() WHERE id=$1", [row.id]);
         return;
       }
-      if (vapiEnabled()) {
+      if (vapiEnabled() && process.env.CALL_PROVIDER !== "twilio") {
         try {
           const v = await createVapiCall({ to: c.phone, callRowId: row.id, contactName: c.name, userName: name, where });
           await q("UPDATE alert_calls SET call_sid=$2, control_url=$3, provider='vapi', status='initiated', updated_at=now() WHERE id=$1", [row.id, v.id, v.controlUrl]);
