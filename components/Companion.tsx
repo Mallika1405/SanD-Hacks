@@ -24,6 +24,8 @@ export default function Companion(props: { sessionId: string; mode: string; onEx
 function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mode: string; onExit: () => void; onFallback: () => void }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [muted, setMuted] = useState(false);
+  const [breathing, setBreathing] = useState(false);
+  const stopBreath = useRef(false);
   const [crisis, setCrisis] = useState<null | "self_harm" | "medical">(null);
   const [pacer, setPacer] = useState<{ pattern: string; rounds: number } | null>(null);
   const [phase, setPhase] = useState<Phase | null>(null);
@@ -54,6 +56,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
       show_crisis_resources: (p: any) => h.current.crisis(p),
       log_to_tracker: (p: any) => h.current.log(p),
       suggest_page: (p: any) => h.current.suggest(p),
+      guide_breathing: (p: any) => h.current.breathe(p),
     },
     onMessage: (m: any) => h.current.onMessage(m),
     onError: () => setErr("The voice connection hit a problem."),
@@ -120,6 +123,32 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
       return "I couldn't log that.";
     },
     suggest: (p: any) => { setSuggest(PAGES[p?.page] ? p.page : null); return "Offered."; },
+    breathe: async (p: any) => {
+      const rounds = Math.min(4, Math.max(3, Number(p?.rounds) || 3));
+      const [plan, v] = await Promise.all([fetch(`/api/breathing?rounds=${rounds}`).then((r) => r.json()).catch(() => null), fetch("/api/voices").then((r) => r.json()).catch(() => null)]);
+      if (!plan?.segments?.length) return "I couldn't start the walkthrough. Count a slow breath yourself: in for four, out for seven.";
+      const voice = v?.assigned?.companion ?? "EXAVITQu4vr4xnSDxMaL";
+      const b64 = (t: string) => { const b = new TextEncoder().encode(t); let x = ""; b.forEach((c) => (x += String.fromCharCode(c))); return btoa(x).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+      const urls: string[] = plan.segments.map((sg: any) => `/api/sos/tts?t=${b64(sg.text)}&s=${sg.sig}&v=${voice}`);
+      stopBreath.current = false; setBreathing(true); setPacer(null);
+      try { (conv as any).setMuted(true); } catch {}
+      const preload = (u: string) => { const a = new Audio(u); a.preload = "auto"; return a; };
+      let next: HTMLAudioElement | null = preload(urls[0]);
+      const t0 = Date.now(), last = plan.segments.length - 2;
+      for (let i = 0; i < plan.segments.length && !stopBreath.current; i++) {
+        // The voice service stops waiting for a tool after 2 minutes, so if we are running long, jump to the closing words.
+        if (Date.now() - t0 > 95000 && i < last) { i = last; next = preload(urls[i]); }
+        const sg = plan.segments[i], a = next!;
+        next = i + 1 < urls.length ? preload(urls[i + 1]) : null;
+        setPhase(sg.phase);
+        await new Promise<void>((res) => { a.onended = () => res(); a.onerror = () => res(); a.play().catch(() => res()); const t = setInterval(() => { if (stopBreath.current) { a.pause(); clearInterval(t); res(); } }, 250); a.addEventListener("ended", () => clearInterval(t)); });
+        if (!stopBreath.current) await new Promise((r) => setTimeout(r, sg.pause_ms));
+      }
+      const stopped = stopBreath.current;
+      setPhase(null); setBreathing(false);
+      try { (conv as any).setMuted(muted); } catch {}
+      return stopped ? "They stopped the breathing walkthrough early. Ask nothing; say one gentle sentence and offer something different." : `The full ${rounds}-round breathing walkthrough just finished. Say one calm sentence noticing that they stayed with it, then continue. Do not ask a question.`;
+    },
   };
 
   /* ---------- breathing pacer ---------- */
@@ -170,6 +199,8 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
             </div>
           )}
         </div>
+
+        {breathing && <div className="text-center"><button onClick={() => { stopBreath.current = true; }} className="b b-ghost">Stop breathing exercise</button></div>}
 
         <div className="mt-5 text-center min-h-[6rem]" aria-live="polite">
           {lastUser && <p className="text-[14px] text-ink2/70 mb-1 line-clamp-2">You: {lastUser}</p>}
