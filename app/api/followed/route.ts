@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   try { places = await safePlaces(lat, lng, 1500, 3); } catch {}
   const nearest = places[0] ?? null;
   const [alert, ] = await Promise.all([
-    createAlert({ userId: s.user_id, sessionId, lat, lng, kind: "soft", reason: "followed", placeText: nearest ? `near ${nearest.name}` : undefined }),
+    createAlert({ userId: s.user_id, sessionId, lat, lng, kind: "soft", reason: "followed", placeText: nearest ? nearest.name : undefined }),
     recordIncident(lat, lng, "followed").catch(() => {}),
   ]);
   return NextResponse.json({ nearest, places, token: alert.token, ownerSecret: alert.owner_secret });

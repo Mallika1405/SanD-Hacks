@@ -96,7 +96,7 @@ function Active() {
     alertSent.current = true;
     setView("alert");
     persistNow("alert");
-    const j = await post("/api/alerts", { sessionId: s.id, reason, lat: p?.lat, lng: p?.lng, placeText: placesRef.current[0] ? `near ${placesRef.current[0].name}` : undefined });
+    const j = await post("/api/alerts", { sessionId: s.id, reason, lat: p?.lat, lng: p?.lng, placeText: placesRef.current[0] ? placesRef.current[0].name : undefined });
     if (j.token) { setAlert({ token: j.token, ownerSecret: j.ownerSecret }); return "Alert sent. Your contacts are being called now."; }
     alertSent.current = false;
     return "I could not send the alert. Please call 911 if you are in danger.";

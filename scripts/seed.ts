@@ -3,8 +3,8 @@ config({ path: ".env.local" });
 import { q } from "../lib/db";
 
 async function main() {
-  await q("DELETE FROM users WHERE name='Maya (demo)'");
-  const [u] = await q<{ id: string }>("INSERT INTO users(name, phone) VALUES ('Maya (demo)', $1) RETURNING id", [process.env.SEED_PHONE_USER || "+15555550100"]);
+  await q("DELETE FROM users WHERE name IN ('Maya','Maya (demo)')");
+  const [u] = await q<{ id: string }>("INSERT INTO users(name, phone) VALUES ('Maya', $1) RETURNING id", [process.env.SEED_PHONE_USER || "+15555550100"]);
   const phones = [process.env.SEED_PHONE_1, process.env.SEED_PHONE_2, process.env.SEED_PHONE_3];
   const names = ["Priya", "Jordan", "Mom"];
   for (let i = 0; i < 3; i++)
