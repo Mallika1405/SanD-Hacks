@@ -79,7 +79,9 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
     const r = await fetch(`/api/companion/start?session=${sessionId}&mode=${mode}`).catch(() => null);
     if (!r?.ok) { onFallback(); return; }
     const j = await r.json();
-    try { (conv as any).startSession({ signedUrl: j.signedUrl, connectionType: "websocket", dynamicVariables: j.vars, ...(j.voiceId ? { overrides: { tts: { voiceId: j.voiceId } } } : {}) }); setStarted(true); try { sessionStorage.setItem(`sw_live_${sessionId}`, "1"); } catch {} }
+    try { (conv as any).startSession({ signedUrl: j.signedUrl, connectionType: "websocket", dynamicVariables: j.vars, ...(j.voiceId ? { overrides: { tts: { voiceId: j.voiceId } } } : {}) }); setStarted(true); try { sessionStorage.setItem(`sw_live_${sessionId}`, "1"); } catch {}
+      // Start looking up trusted sources right away so the Sources panel fills in (not for OCD/intrusive thoughts, which use reviewed techniques only).
+      if (mode === "panic" || mode === "overwhelm") setTimeout(() => { try { h.current.techniques({ situation: mode === "overwhelm" ? "feeling overwhelmed" : "panic attack" }); } catch {} }, 1500); }
     catch { onFallback(); }
   }, [sessionId, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const [resume, setResume] = useState(false);
@@ -206,7 +208,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
             {tab === "anchors" && <div className="space-y-2">{(anchors.length ? anchors : ["Feel both feet on the floor", "Let your shoulders drop", "Notice one thing you can see"]).map((a) => (
               <button key={a} role="checkbox" aria-checked={!!checked[a]} onClick={() => setChecked((c) => ({ ...c, [a]: !c[a] }))} className="check-row"><span className="box">{checked[a] && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span className="text-[14.5px]">{a}</span></button>))}</div>}
             {tab === "sources" && <div className="text-[14.5px] space-y-2"><p className="text-ink2">When your situation is specific, Juno looks up techniques on trusted health sites. They aren't reviewed by a clinician.</p>
-              <p>{tech.status === "pending" ? <span className="text-sage font-medium">● Looking them up right now…</span> : tech.items.length ? <span className="text-sage font-medium">{tech.items.length} techniques from {names.slice(0, 2).join(" and ")}</span> : <span className="text-ink2">Nothing looked up yet.</span>}</p>
+              <p>{tech.status === "pending" || (!tech.items.length && !tech.status && started && (mode === "panic" || mode === "overwhelm")) ? <span className="text-sage font-medium">● Looking them up right now…</span> : tech.items.length ? <span className="text-sage font-medium">{tech.items.length} techniques from {names.slice(0, 2).join(" and ")}</span> : <span className="text-ink2">Nothing looked up yet.</span>}</p>
               <ul className="space-y-1">{tech.items.slice(0, 4).map((i) => <li key={i.title + i.source_url}><a className="underline text-slate" target="_blank" rel="noreferrer" href={i.source_url}>{i.title}</a> <span className="text-ink2">· {i.source_name}</span></li>)}</ul></div>}
             {tab === "sound" && <div className="space-y-3"><p className="text-[14.5px] text-ink2">Calming sound made with ElevenLabs, playing softly under our conversation.</p>
               <div className="flex flex-wrap gap-2">{SCENES.map(([k, l]) => <button key={k} className="chip" aria-pressed={scene === k} onClick={() => playScene(scene === k ? "off" : k)}>{l}</button>)}</div>
