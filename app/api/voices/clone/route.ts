@@ -29,7 +29,9 @@ export async function POST(req: Request) {
   fd.append("files", file, (file as File).name || "voice.webm");
   const r = await fetch("https://api.elevenlabs.io/v1/voices/add", { method: "POST", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY }, body: fd, signal: AbortSignal.timeout(50000) }).catch(() => null);
   if (!r || !r.ok) {
-    console.error("clone failed", r?.status, r ? (await r.text()).slice(0, 300) : "");
+    const body = r ? (await r.text()).slice(0, 300) : "";
+    console.error("clone failed", r?.status, body);
+    if (r?.status === 401 && /voices_write|missing_permissions/.test(body)) return NextResponse.json({ error: "Your ElevenLabs API key doesn't have permission to create voices. In ElevenLabs, open the key's settings, turn on Voices: Write, save, and try again." }, { status: 502 });
     return NextResponse.json({ error: "I couldn't create that voice. Try a clearer, longer recording." }, { status: 502 });
   }
   const { voice_id } = await r.json();
