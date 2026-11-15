@@ -1,4 +1,4 @@
-# anchor.
+# Anchor
 
 A voice-first companion for panic, intrusive thoughts and overwhelm. It talks you through the moment, keeps a diary that talks back, helps you keep up with therapy, and finds real therapists, clinics and support groups near you. It adapts its tone, advice and layout to what each person is going through.
 

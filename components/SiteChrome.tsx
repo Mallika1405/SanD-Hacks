@@ -42,7 +42,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-canvas/85 backdrop-blur">
       <div className="max-w-[1040px] mx-auto px-4 lg:px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="serif" aria-label="Anchor, home">anchor</Link>
+        <Link href="/" className="serif" aria-label="Anchor, home">Anchor</Link>
         <div className="flex items-center gap-2">
           <Link href="/now?sos=1" className="h-9 px-3.5 inline-flex items-center rounded-full bg-terrasoft text-terradeep text-[14px] font-semibold">I need help now</Link>
           <div className="relative" ref={box}>
