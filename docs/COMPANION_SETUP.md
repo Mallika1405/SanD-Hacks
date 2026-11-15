@@ -70,3 +70,6 @@ Add these under Tools -> Client tool. Names must match exactly. "Wait for respon
 
 ## 4. Optional: soundscapes
 Soundscapes use ElevenLabs Sound Effects. On your API key, set **Sound Effects -> Access** (or turn Restrict key off).
+
+---
+**Already applied:** on Nov 15, the agent was updated through the API (Gemini 2.5 Flash, this prompt, these 8 tools, first message `{{opening_line}}`, the variables above). A backup of the previous configuration is kept outside the repo. The voice model stays `eleven_flash_v2` because ElevenLabs requires a v2 model for English agents.
