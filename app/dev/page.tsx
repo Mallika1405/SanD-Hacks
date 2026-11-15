@@ -45,7 +45,7 @@ export default function Dev() {
           {data.calls.map((c: any) => (
             <div key={c.id} className="flex justify-between items-center text-sm">
               <span>{c.name} — {c.status}{c.digit ? ` (pressed ${c.digit})` : ""}</span>
-              {!state?.twilio && <button onClick={() => press(c.id)} className="px-3 rounded-lg bg-accent text-ground">Press 1</button>}
+              {(!state?.twilio || ["failed", "dry_run"].includes(c.status)) && <button onClick={() => press(c.id)} className="px-3 rounded-lg bg-accent text-ground">Press 1</button>}
             </div>
           ))}
           <ul className="text-xs text-muted">{data.events.map((e: any, i: number) => <li key={i}>{new Date(e.created_at).toLocaleTimeString()} {e.note ?? e.kind}</li>)}</ul>
