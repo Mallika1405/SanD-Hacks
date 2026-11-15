@@ -159,9 +159,14 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
           <p className="flex items-center gap-2 text-[14.5px] font-medium"><i className={`size-2.5 rounded-full ${conv.status === "connected" ? "bg-sage" : "bg-[#CFC9BB]"}`} aria-hidden />Juno · {status}</p>
         </div>
 
-        <div className="bc manual mt-5" style={{ ["--s" as any]: phase ? phase.scale : conv.isSpeaking ? 1.04 : 1, ["--d" as any]: phase ? `${phase.ms / 1000}s` : "1.2s" }} aria-hidden>
-          <i className="r r1" /><i className="r r2" /><i className="r r3" />
-          <div className="core"><div className="px-2"><p className="serif text-[1.25rem] leading-tight">{phase ? phase.label : conv.isSpeaking ? "Juno" : conv.status === "connected" ? "I'm here" : "…"}</p></div></div>
+        <div className="mt-8 flex flex-col items-center gap-4" aria-hidden>
+          <div className={`voice-bars ${conv.isSpeaking ? "speaking" : conv.status === "connected" && !muted ? "listening" : ""}`}>{Array.from({ length: 21 }).map((_, i) => <i key={i} style={{ ["--i" as any]: i }} />)}</div>
+          {phase && (
+            <div className="w-full max-w-[320px] space-y-2 text-center">
+              <p className="serif text-[1.6rem] leading-tight">{phase.label}</p>
+              <div className="pace-track"><div className="pace-fill" style={{ width: phase.scale >= 1 ? "100%" : "12%", transitionDuration: `${phase.ms / 1000}s` }} /></div>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 text-center min-h-[6rem]" aria-live="polite">

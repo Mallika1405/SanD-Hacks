@@ -292,3 +292,12 @@ html[data-immersive] header, html[data-immersive] nav[aria-label="Main"], html[d
 .help-cta { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 24px; color: #fff; text-decoration: none; background: var(--grad); box-shadow: 0 18px 36px -18px color-mix(in srgb, var(--sage) 90%, black), 0 1px 0 rgba(255,255,255,.25) inset; transition: transform .2s ease, box-shadow .2s ease; }
 .help-cta:hover { transform: translateY(-2px); }
 .help-cta .ico { width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; background: rgba(255,255,255,.18); flex: none; }
+
+/* Voice bars and breathing pace bar (replaces the old circle) */
+.voice-bars { display: flex; align-items: center; justify-content: center; gap: 5px; height: 64px; }
+.voice-bars i { display: block; width: 4px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 40%, transparent); transition: background .3s ease; }
+.voice-bars.listening i { background: color-mix(in srgb, var(--sage-deep) 70%, white); animation: vb 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.11s); }
+.voice-bars.speaking i { background: #CFF3E6; animation: vb 0.9s ease-in-out infinite; animation-delay: calc(var(--i) * -0.07s); }
+@keyframes vb { 0%, 100% { height: 8px; } 50% { height: calc(14px + (var(--i) * 7 % 38) * 1px); } }
+.pace-track { height: 8px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
+.pace-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7FD3B8, #CFF3E6); transition-property: width; transition-timing-function: ease-in-out; }

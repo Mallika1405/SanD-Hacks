@@ -34,7 +34,6 @@ export default function Login() {
     <div className="min-h-dvh grid lg:grid-cols-[1fr_1fr]">
       <section className="px-6 py-10 lg:px-14 lg:py-16 flex flex-col justify-between gap-10" style={{ background: "linear-gradient(160deg, var(--mint) 0%, var(--canvas) 70%)" }}>
         <p className="serif text-[1.5rem]">somewhere</p>
-        <div className="bc" aria-hidden style={{ margin: "0 auto" }}><i className="r r1" /><i className="r r2" /><i className="r r3" /><div className="core"><p className="serif text-[1.15rem]">breathe</p></div></div>
         <div className="max-w-[26rem] space-y-4">
           <h1 className="!text-[2.1rem] lg:!text-[2.6rem] leading-[1.1]">A calm place to land when your head is loud.</h1>
           <p className="text-ink2 text-[1.02rem]">Somewhere has someone to talk to at 3am, a place to keep track of how you're really doing, and a way to keep up with the help you're getting.</p>
