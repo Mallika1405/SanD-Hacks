@@ -6,7 +6,7 @@ export const geminiEnabled = () => !!process.env.GEMINI_API_KEY;
 export async function gemini<T = any>(prompt: string, json = true): Promise<T | null> {
   if (!geminiEnabled()) return null;
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, apiVersion: "v1beta" });
     const res = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
