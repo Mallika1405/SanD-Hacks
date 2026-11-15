@@ -42,6 +42,7 @@ function Now() {
     else if (modeParam && OPTS[modeParam]) { auto.current = true; start(modeParam); router.replace("/now"); }
   }, [sos, modeParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { if (session) document.documentElement.dataset.immersive = "1"; else delete document.documentElement.dataset.immersive; return () => { delete document.documentElement.dataset.immersive; }; }, [session]);
   const order = conds.includes("ocd") ? ["intrusive", "panic", "overwhelm", "talk"] : ["panic", "intrusive", "overwhelm", "talk"];
 
   return (
@@ -62,8 +63,12 @@ function Now() {
         </div>
       )}
       {err && <p role="alert" className="text-terra">{err}</p>}
-      {session && (scripted ? <Guide key={session.id} sessionId={session.id} onExit={() => setSession(null)} /> : <Companion key={session.id} sessionId={session.id} mode={session.flow} onExit={() => setSession(null)} onFallback={() => setScripted(true)} />)}
-      {session && !scripted && <p className="text-[13px] text-ink2">Prefer simple spoken steps without a live conversation? <button className="underline" onClick={() => setScripted(true)}>Use guided steps</button></p>}
+      {session && (
+        <div className="immersive"><div className="max-w-[560px] mx-auto space-y-4">
+          {scripted ? <Guide key={session.id} sessionId={session.id} onExit={() => setSession(null)} /> : <Companion key={session.id} sessionId={session.id} mode={session.flow} onExit={() => setSession(null)} onFallback={() => setScripted(true)} />}
+          {!scripted && <p className="text-[13px] text-ink2 text-center">Prefer simple spoken steps without a live conversation? <button className="underline" onClick={() => setScripted(true)}>Use guided steps</button></p>}
+        </div></div>
+      )}
     </div>
   );
 }

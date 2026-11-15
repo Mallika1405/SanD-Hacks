@@ -65,23 +65,30 @@ export default function Today() {
     try { await navigator.clipboard.writeText(t); setCopied(true); } catch {}
   }
 
+  const MOOD_COLORS = ["#6FBF9F", "#A7C97A", "#E6C45E", "#E8955F", "#D1634A"];
+  const Ico = ({ d }: { d: string }) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden dangerouslySetInnerHTML={{ __html: d }} />;
+  const ICONS = { therapy: '<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>', track: '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>', diary: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M9 9h6M9 13h4"/>', talk: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' };
+  const Tile = ({ href, icon, tone = "", title, sub }: { href: string; icon: string; tone?: string; title: string; sub: string }) => (
+    <Link href={href} className="tile"><span className={`ico ${tone}`}><Ico d={icon} /></span><span className="min-w-0 flex-1"><span className="block font-bold text-[15px] leading-snug">{title}</span><span className="block text-[13.5px] text-ink2 truncate">{sub}</span></span><span className="text-ink2" aria-hidden>→</span></Link>
+  );
+
   return (
-    <div className="max-w-[640px] mx-auto space-y-8 fade-in">
-      <section className="pt-2">
-        <h1>{hello}{name ? `, ${name}` : ""}.</h1>
-        <p className="mt-1.5 text-ink2 text-[1.02rem]">
-          {!me ? " " : mood != null && mood >= 3 ? "That sounds like a lot right now. I'm here if you want company." : signal ? "I noticed something in your diary I'd like to check in about." : plan?.next_at ? `Your next session is ${day(plan.next_at)}, ${inDays(plan.next_at)}.` : personaFor(conds).todayLine}
-        </p>
+    <div className="max-w-[640px] mx-auto space-y-9">
+      <section className="hero">
+        <div>
+          <p className="text-[13.5px] text-ink2 font-semibold tracking-wide uppercase">{new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</p>
+          <h1 className="mt-2">{hello}{name ? <>,<br />{name}.</> : "."}</h1>
+          <p className="mt-3 text-ink2 text-[1.05rem] max-w-[30ch]">
+            {!me ? " " : mood != null && mood >= 3 ? "That sounds like a lot right now. I'm here if you want company." : signal ? "I noticed something in your diary I'd like to check in about." : plan?.next_at ? `Your next session is ${day(plan.next_at)}, ${inDays(plan.next_at)}.` : personaFor(conds).todayLine}
+          </p>
+        </div>
+        <Link href="/now?sos=1" className="orb-btn" aria-label="I need a hand right now. Start a guided moment with Juno."><span className="px-3 leading-tight">I need a hand<br />right now</span></Link>
       </section>
 
-      <section className="flex flex-wrap gap-2.5">
-        <Link href="/now?sos=1" className="b b-primary">I need a hand right now</Link>
-      </section>
-
-      <section aria-label="How anxious are you right now">
+      <section aria-label="How anxious are you right now" className="space-y-3">
         <h2>How anxious are you right now?</h2>
-        <div className="mt-2.5 flex flex-wrap gap-2">{MOODS.map(([l], i) => <button key={l} className="chip" aria-pressed={mood === i} onClick={() => logMood(i)}>{l}</button>)}</div>
-        {mood != null && <p className="mt-2.5 text-[14px] text-ink2">{mood >= 3 ? <>Thanks for telling me. <Link className="underline text-ink" href="/now?sos=1">Want to start something together?</Link></> : "Thanks. Noted."}</p>}
+        <div className="mood" role="group" aria-label="Anxiety level">{MOODS.map(([l], i) => <button key={l} aria-pressed={mood === i} onClick={() => logMood(i)}><i style={{ background: mood === i ? "#fff" : MOOD_COLORS[i] }} />{["Calm", "Uneasy", "Anxious", "Very anxious", "Panicking"][i]}</button>)}</div>
+        {mood != null && <p className="text-[14px] text-ink2">{mood >= 3 ? <>Thanks for telling me. <Link className="underline text-ink" href="/now?sos=1">Want to start something together?</Link></> : "Thanks. Noted."}</p>}
       </section>
 
       {signal && (
@@ -96,20 +103,20 @@ export default function Today() {
         </section>
       )}
 
-      <section>
-        <h2>Today</h2>
-        <div className="mt-1">
-          {plan?.next_at && <Link href="/therapy" className="link-row"><span><span className="block font-medium text-[14.5px]">Therapy {day(plan.next_at)}, {time(plan.next_at)}</span><span className="block text-[13px] text-ink2">{plan.therapist_name ?? "Your therapist"}{open.length ? ` · ${open.length} homework item${open.length > 1 ? "s" : ""} open` : " · homework done"}</span></span><span className="text-ink2">→</span></Link>}
-          {!plan && th && <Link href="/therapy" className="link-row"><span><span className="block font-medium text-[14.5px]">Keep up with your therapy</span><span className="block text-[13px] text-ink2">Add your appointments and homework</span></span><span className="text-ink2">→</span></Link>}
-          {th?.adherence?.lastMissed && <Link href="/therapy" className="link-row"><span><span className="block font-medium text-[14.5px]">You missed your last session</span><span className="block text-[13px] text-ink2">Rescheduling soon can help you stay on track</span></span><span className="text-ink2">→</span></Link>}
-          {due && <Link href="/now?mode=talk" className="link-row"><span><span className="block font-medium text-[14.5px]">You asked me to check in</span><span className="block text-[13px] text-ink2">A minute, whenever you're ready</span></span><span className="text-ink2">→</span></Link>}
-          <Link href="/tracker" className="link-row"><span><span className="block font-medium text-[14.5px]">{conds.includes("ocd") ? "Log an urge" : conds.includes("panic") ? "Log a panic episode" : "How does today feel?"}</span><span className="block text-[13px] text-ink2">Under a minute</span></span><span className="text-ink2">→</span></Link>
-          {dy?.entries?.[0] && <Link href="/diary" className="link-row"><span><span className="block font-medium text-[14.5px]">Last diary entry: {dy.entries[0].title}</span><span className="block text-[13px] text-ink2">{Math.max(0, Math.round((Date.now() - new Date(dy.entries[0].created_at).getTime()) / 864e5))} days ago</span></span><span className="text-ink2">→</span></Link>}
+      <section className="space-y-3">
+        <h2>For today</h2>
+        <div className="space-y-3">
+          {plan?.next_at && <Tile href="/therapy" icon={ICONS.therapy} title={`Therapy ${day(plan.next_at)}, ${time(plan.next_at)}`} sub={`${plan.therapist_name ?? "Your therapist"}${open.length ? ` · ${open.length} homework item${open.length > 1 ? "s" : ""} open` : " · homework done"}`} />}
+          {!plan && th && <Tile href="/therapy" icon={ICONS.therapy} title="Keep up with your therapy" sub="Add your appointments and homework" />}
+          {th?.adherence?.lastMissed && <Tile href="/therapy" tone="t3" icon={ICONS.therapy} title="You missed your last session" sub="Rescheduling soon can help you stay on track" />}
+          {due && <Tile href="/now?mode=talk" tone="t4" icon={ICONS.talk} title="You asked me to check in" sub="A minute, whenever you're ready" />}
+          <Tile href="/tracker" tone="t2" icon={ICONS.track} title={conds.includes("ocd") ? "Log an urge" : conds.includes("panic") ? "Log a panic episode" : "How does today feel?"} sub="Under a minute" />
+          {dy?.entries?.[0] && <Tile href="/diary" tone="t4" icon={ICONS.diary} title={`Last diary entry: ${dy.entries[0].title}`} sub={`${Math.max(0, Math.round((Date.now() - new Date(dy.entries[0].created_at).getTime()) / 864e5))} days ago`} />}
         </div>
       </section>
 
       {tr && tr.logs.length > 0 && (
-        <section className="only-balanced">
+        <section className="only-balanced card p-5">
           <h2>This week</h2>
           <p className="mt-1.5 text-[15px] text-ink2">{weekLine(tr.kind, tr.logs)}</p>
           {dy?.progress === "improving" && <p className="mt-1 text-[14px] text-sage">Your recent diary entries have felt a bit lighter than the ones before.</p>}

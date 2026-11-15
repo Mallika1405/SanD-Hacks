@@ -179,11 +179,11 @@ export default function Diary() {
               <div ref={thread} className="space-y-3 max-h-[26rem] overflow-y-auto pr-1" aria-live="polite">
                 {msgs.map((m, i) => (
                   <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <p className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${m.role === "user" ? "bg-sage/15" : "bg-stone"}`}>{m.text}</p>
+                    <p className={`bubble ${m.role === "user" ? "me" : "it"}`}>{m.text}</p>
                   </div>
                 ))}
-                {interim && <div className="flex justify-end"><p className="max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] text-ink2/70 bg-sage/10">{interim}…</p></div>}
-                {busy && <p className="text-[13px] text-ink2">…</p>}
+                {interim && <div className="flex justify-end"><p className="bubble me" style={{ opacity: .65 }}>{interim}…</p></div>}
+                {busy && <div className="bubble it !p-0 w-fit" aria-label="Typing"><span className="typing"><i /><i /><i /></span></div>}
               </div>
               {err && <p role="alert" className="text-terra text-[14px]">{err}</p>}
               <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="flex items-end gap-2">

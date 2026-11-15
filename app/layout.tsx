@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Newsreader, Plus_Jakarta_Sans } from "next/font/google";
+import { Lora, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 import { Dock, Footer, Header } from "@/components/SiteChrome";
 import ThemeProvider from "@/components/ThemeProvider";
 import { Aurora, Toaster } from "@/components/Motion";
 
-const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
-const newsreader = Newsreader({ variable: "--font-newsreader", subsets: ["latin"] });
+const jakarta = Nunito_Sans({ variable: "--font-jakarta", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const newsreader = Lora({ variable: "--font-newsreader", subsets: ["latin"], weight: ["400", "500", "600"] });
 export const metadata: Metadata = { title: "Somewhere. Space to breathe", description: "A calm, guided companion for panic, racing thoughts and overwhelm, and a path to real care." };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#FAF8F5" };
 
