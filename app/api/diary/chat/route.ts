@@ -6,6 +6,7 @@ import { out } from "@/lib/speech";
 import { ensureDevice } from "@/lib/device";
 import { q } from "@/lib/db";
 import { personaFor, WRITING_CARE } from "@/lib/personas";
+import { playbookText } from "@/lib/playbooks";
 
 export const maxDuration = 30;
 const Body = z.object({
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
 
   const [prof] = await q<any>("SELECT display_name, conditions FROM profiles WHERE device_id=$1", [device]).catch(() => []);
   const persona = personaFor(prof?.conditions);
+  const playbook = await playbookText(prof?.conditions, 1100);
   const themes = await q<any>("SELECT t AS name FROM diary_entries, unnest(themes) t WHERE device_id=$1 GROUP BY t ORDER BY count(*) DESC LIMIT 4", [device]).catch(() => []);
   const convo = msgs.map((m) => `${m.role === "user" ? "Them" : "You"}: ${m.text}`).join("\n");
   const g = await gemini<{ reply: string }>(
@@ -53,6 +55,7 @@ How you reply:
 - If their words suggest hopelessness, feeling like a burden, or not wanting to be here, gently say you're glad they said it, and that talking to their therapist or calling or texting 988 can help. Never dismiss it.
 - Never diagnose, never promise outcomes, never say "calm down", "don't worry" or "you're fine", never give medical advice, never tell them to change medication.
 - Tone for this person: ${persona.style} Never: ${persona.avoid}.
+- Research notes for this person (from trusted health sites and peer-reviewed studies). Let them quietly shape your reply; never recite them: ${playbook || "none yet"}
 - ${WRITING_CARE}
 - If they say they're done, say a warm closing line and remind them they can save the entry.`,
     });

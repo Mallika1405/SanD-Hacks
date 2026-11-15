@@ -23,6 +23,10 @@ export default function Companion(props: { sessionId: string; mode: string; onEx
 
 function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mode: string; onExit: () => void; onFallback: () => void }) {
   const [lines, setLines] = useState<Line[]>([]);
+  const all = useRef<Line[]>([]);
+  const saveOn = useRef(true);
+  const [saveUi, setSaveUi] = useState(true);
+  const saveTimer = useRef<any>(null);
   const [muted, setMuted] = useState(false);
   const [breathing, setBreathing] = useState(false);
   const stopBreath = useRef(false);
@@ -92,7 +96,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
     // A page reload (or dev hot-reload) mid-conversation must not silently start talking again.
     let again = false; try { again = !!sessionStorage.getItem(`sw_live_${sessionId}`); } catch {}
     if (again) setResume(true); else connect();
-    return () => { try { sound.current?.pause(); (conv as any).endSession(); } catch {} }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { persist(true); try { sound.current?.pause(); (conv as any).endSession(); } catch {} }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- safety: the conversation can never override this ---------- */
   const checkSafety = async (text: string) => {
@@ -100,12 +104,23 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
     if (j?.level === "crisis") setCrisis("self_harm"); else if (j?.level === "medical") setCrisis("medical");
   };
 
+  /* ---------- saving the conversation (the person can turn it off) ---------- */
+  const persist = (ended: boolean) => {
+    if (!saveOn.current || !all.current.length) return;
+    const send = () => fetch("/api/conversations", { method: "POST", keepalive: true, body: JSON.stringify({ sessionId, transcript: all.current, mode, ended }) }).catch(() => {});
+    clearTimeout(saveTimer.current);
+    if (ended) send(); else saveTimer.current = setTimeout(send, 6000);
+  };
+  useEffect(() => { fetch("/api/conversations").then((r) => r.json()).then((j) => { saveOn.current = j.save !== false; setSaveUi(saveOn.current); }).catch(() => {}); }, []);
+  const toggleSave = async () => { const v = !saveOn.current; saveOn.current = v; setSaveUi(v); await fetch("/api/conversations", { method: "POST", body: JSON.stringify({ save: v }) }).catch(() => {}); if (v) persist(false); };
+
   /* ---------- tools the companion can call ---------- */
   h.current = {
     onMessage: (m: any) => {
       const role: "user" | "agent" = (m.source ?? m.role) === "user" ? "user" : "agent";
       const text = String(m.message ?? m.text ?? "").trim(); if (!text) return;
       setLines((l) => [...l.slice(-30), { role, text }]);
+      all.current = [...all.current, { role, text }]; persist(false);
       if (role === "user") checkSafety(text);
       setTimeout(() => scroller.current?.scrollTo({ top: 1e6, behavior: "smooth" }), 50);
     },
@@ -175,7 +190,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
   };
 
   const toggleMute = () => { const m = !muted; setMuted(m); try { (conv as any).setMuted(m); } catch {} };
-  const end = () => { try { sound.current?.pause(); (conv as any).endSession(); } catch {} onExit(); };
+  const end = () => { persist(true); try { sound.current?.pause(); (conv as any).endSession(); } catch {} onExit(); };
   const say = (t: string) => { try { (conv as any).sendUserMessage(t); } catch {} };
 
   const status = conv.status === "connected" ? (conv.isSpeaking ? "Speaking" : muted ? "Muted" : "Listening") : started ? "Connecting…" : "Starting…";
@@ -218,6 +233,8 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
           <button onClick={() => setCrisis("self_harm")} className="b b-terrasoft">I need help now</button>
           <button onClick={end} className="b b-ghost">End conversation</button>
         </div>
+
+        <p className="mt-3 text-[12.5px] text-ink2 text-center">{saveUi ? "This conversation is being saved to your history so you can look back on it." : "This conversation is not being saved."} <button onClick={toggleSave} className="underline">{saveUi ? "Don't save" : "Save it"}</button></p>
 
         {lines.length > 0 && (
           <details className="mt-4 card-flat p-4"><summary className="cursor-pointer text-[14px] font-semibold min-h-10 flex items-center">Conversation so far</summary>

@@ -18,6 +18,10 @@ function Seg({ label, value, opts, onPick }: { label: string; value: string; opt
 
 export default function You() {
   const [mode, setMode] = useState<Mode>("system");
+  const [cv, setCv] = useState<{ save: boolean; items: any[] } | null>(null);
+  const [openCv, setOpenCv] = useState<any>(null);
+  const loadCv = () => fetch("/api/conversations").then((r) => r.json()).then(setCv).catch(() => {});
+  useEffect(() => { loadCv(); }, []);
   useEffect(() => { setMode(getMode()); }, []);
   const router = useRouter();
   const [d, setD] = useState<any>(null);
@@ -88,6 +92,23 @@ export default function You() {
           <div className="row"><span><span className="block text-[15px]">What helps you</span><span className="block text-[13px] text-ink2">{d.prefs?.favorite ? `${d.prefs.favorite}${d.prefs.hard_times ? `, and ${d.prefs.hard_times} are harder` : ""}` : "Nothing remembered yet"}</span></span>{(d.prefs?.favorite || d.prefs?.hard_times) && <button onClick={forget} className="text-[13px] underline text-ink2 min-h-10">Forget</button>}</div>
           <Link href="/voice" className="link-row"><span><span className="block text-[15px]">Juno's voice</span><span className="block text-[13px] text-ink2">{d.prefs?.voice_name ?? "Default"}{d.prefs?.voice_kind === "clone" ? " (a voice you trust)" : ""}</span></span><span className="text-ink2">→</span></Link>
         </div>
+      </Fold>
+
+      <Fold title="Conversations with Juno">
+        <p className="text-[14px] text-ink2">Your talks with Juno are saved here, word for word, so you can look back on them. Only you can see them.</p>
+        <button role="switch" aria-checked={cv?.save !== false} onClick={async () => { await fetch("/api/conversations", { method: "POST", body: JSON.stringify({ save: cv?.save === false }) }); loadCv(); }} className="check-row"><span className="box">{cv?.save !== false && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span>Save my conversations with Juno</span></button>
+        {cv && !cv.items.length && <p className="text-[14px] text-ink2">Nothing saved yet.</p>}
+        {(cv?.items ?? []).map((c: any) => (
+          <div key={c.id} className="card-flat p-4 space-y-1.5">
+            <p className="text-[12.5px] text-ink2">{when(c.started_at)} · {FLOW[c.mode] ?? c.mode} · {c.lines} lines</p>
+            <p className="text-[14.5px]">{c.summary ?? "A conversation with Juno."}</p>
+            <div className="flex gap-3 text-[13px]">
+              <button className="underline" onClick={async () => { if (openCv?.id === c.id) return setOpenCv(null); const j = await fetch(`/api/conversations?id=${c.id}`).then((r) => r.json()); setOpenCv(j.conversation); }}>{openCv?.id === c.id ? "Hide" : "Read it"}</button>
+              <button className="underline text-terra" onClick={async () => { if (!confirm("Delete this conversation?")) return; await fetch(`/api/conversations?id=${c.id}`, { method: "DELETE" }); setOpenCv(null); loadCv(); }}>Delete</button>
+            </div>
+            {openCv?.id === c.id && <div className="max-h-72 overflow-y-auto space-y-2 pt-2">{(openCv.transcript ?? []).map((l: any, i: number) => <p key={i} className="text-[14px]"><b>{l.role === "user" ? "You" : "Juno"}:</b> {l.text}</p>)}</div>}
+          </div>
+        ))}
       </Fold>
 
       <Fold title="Recent sessions">
