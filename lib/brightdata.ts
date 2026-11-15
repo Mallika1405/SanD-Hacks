@@ -6,7 +6,7 @@ async function bd(zone: string, url: string) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.BRIGHTDATA_API_KEY}` },
     body: JSON.stringify({ zone, url, format: "raw" }),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(45000),
   });
   if (!r.ok) throw new Error(`brightdata ${r.status}`);
   return r.text();
