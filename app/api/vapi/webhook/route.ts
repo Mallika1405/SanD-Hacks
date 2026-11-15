@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const m = body?.message;
   if (!m) return NextResponse.json({});
-  const vapiCallId: string | undefined = m.call?.id;
+  const vapiCallId: string | undefined = m.call?.id ?? m.callId;
   const rowFor = async () => {
     const meta = m.call?.metadata?.callRowId;
     if (meta) return meta as string;
@@ -19,7 +19,9 @@ export async function POST(req: Request) {
   };
 
   if (m.type === "tool-calls" || m.type === "function-call") {
-    const list = m.toolCallList ?? (m.functionCall ? [{ id: m.functionCall.id ?? "1", name: m.functionCall.name }] : []);
+    const raw = m.toolCallList ?? m.toolCalls ?? (m.functionCall ? [{ id: m.functionCall.id ?? "1", name: m.functionCall.name }] : []);
+    // Vapi sends either {id, name} or {id, function: {name}}
+    const list = raw.map((t: any) => ({ id: t.id, name: t.name ?? t.function?.name }));
     const rowId = await rowFor();
     const results = [];
     for (const t of list) {
@@ -28,6 +30,11 @@ export async function POST(req: Request) {
       results.push({ toolCallId: t.id, result });
     }
     return NextResponse.json({ results });
+  }
+
+  if (m.type === "end-of-call-report" && vapiCallId) {
+    await q("UPDATE alert_calls SET status=CASE WHEN status IN ('initiated','ringing','in-progress','queued') THEN 'completed' ELSE status END, updated_at=now() WHERE call_sid=$1", [vapiCallId]);
+    return NextResponse.json({});
   }
 
   if (m.type === "status-update" && vapiCallId) {

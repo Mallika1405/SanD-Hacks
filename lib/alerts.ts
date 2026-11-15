@@ -80,7 +80,7 @@ async function dialAll(alert: Alert, attempt: number, onlyContactIds?: string[])
       }
       if (vapiEnabled()) {
         try {
-          const v = await createVapiCall({ to: c.phone, callRowId: row.id, contactName: c.name, briefing: await briefing(alert) });
+          const v = await createVapiCall({ to: c.phone, callRowId: row.id, contactName: c.name, userName: name, where });
           await q("UPDATE alert_calls SET call_sid=$2, control_url=$3, provider='vapi', status='initiated', updated_at=now() WHERE id=$1", [row.id, v.id, v.controlUrl]);
         } catch (e) {
           await q("UPDATE alert_calls SET status='failed', provider='vapi', updated_at=now() WHERE id=$1", [row.id]);
