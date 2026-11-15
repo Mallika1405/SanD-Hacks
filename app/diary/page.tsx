@@ -74,10 +74,10 @@ export default function Diary() {
       if (soundsRef.current && now - lastResult.current > 6500 && now - lastBack.current > 30000 && wordsRef.current.length > 0 && listenRef.current.length) {
         lastBack.current = now; say(listenRef.current[Math.floor(Math.random() * listenRef.current.length)], 0.55);
       }
+      const total = wordsRef.current.join(" ").split(/\s+/).length;
       // silent safety check as she talks: if she says something alarming, help appears right away (no waiting for the end)
       if (total - lastCheckLen.current > 40 && now - lastResult.current > 1500) { lastCheckLen.current = total; safetyCheck(); }
       // optional: one short reflection after she has said a good amount
-      const total = wordsRef.current.join(" ").split(/\s+/).length;
       if (reflectRef.current && now - lastResult.current > 3500 && total - lastReflectLen.current > 60) {
         lastReflectLen.current = total; reflect();
       }
