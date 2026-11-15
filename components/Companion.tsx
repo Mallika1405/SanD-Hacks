@@ -79,10 +79,15 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
     const r = await fetch(`/api/companion/start?session=${sessionId}&mode=${mode}`).catch(() => null);
     if (!r?.ok) { onFallback(); return; }
     const j = await r.json();
-    try { (conv as any).startSession({ signedUrl: j.signedUrl, connectionType: "websocket", dynamicVariables: j.vars }); setStarted(true); }
+    try { (conv as any).startSession({ signedUrl: j.signedUrl, connectionType: "websocket", dynamicVariables: j.vars }); setStarted(true); try { sessionStorage.setItem(`sw_live_${sessionId}`, "1"); } catch {} }
     catch { onFallback(); }
   }, [sessionId, mode]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { connect(); return () => { try { sound.current?.pause(); (conv as any).endSession(); } catch {} }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [resume, setResume] = useState(false);
+  useEffect(() => {
+    // A page reload (or dev hot-reload) mid-conversation must not silently start talking again.
+    let again = false; try { again = !!sessionStorage.getItem(`sw_live_${sessionId}`); } catch {}
+    if (again) setResume(true); else connect();
+    return () => { try { sound.current?.pause(); (conv as any).endSession(); } catch {} }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- safety: the conversation can never override this ---------- */
   const checkSafety = async (text: string) => {
@@ -162,7 +167,8 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
 
         <div className="mt-5 text-center min-h-[6rem]" aria-live="polite">
           {lastUser && <p className="text-[14px] text-ink2/70 mb-1 line-clamp-2">You: {lastUser}</p>}
-          <p className="serif text-[1.5rem] leading-[1.3]">{lastAgent ?? (err ? "" : "Connecting you…")}</p>
+          <p className="serif text-[1.5rem] leading-[1.3]">{lastAgent ?? (resume && !started ? "The page reloaded, so I paused." : err ? "" : "Connecting you…")}</p>
+          {resume && !started && <button onClick={() => { setResume(false); connect(); }} className="b b-primary mt-3">Pick up again</button>}
         </div>
         {err && <p role="alert" className="text-terra text-center text-[14.5px]">{err} <button onClick={connect} className="underline">Try again</button></p>}
 
