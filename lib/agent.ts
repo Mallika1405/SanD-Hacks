@@ -112,9 +112,9 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   let exBase = 0; // index in the exercise of the first exercise segment in `say`
 
   // Techniques Bright Data researched for her situation (never for intrusive thoughts: reviewed exercises only).
-  const sourced = ctx.rkey && flow !== "intrusive" ? await listSourced(ctx.rkey) : [];
+  const sourced = ctx.rkey && flow !== "intrusive" ? await listSourced(ctx.rkey, ctx.exId) : [];
   const exMap = new Map<string, any>(sourced.map((e) => [e.id, e]));
-  const getEx = (id: string): any => exMap.get(id) ?? getExercise(id);
+  const getEx = (id: string): any => exMap.get(id) ?? getExercise(id) ?? getExercise(BY_FLOW[seqFlow()][0]);
   let research: TurnOut["research"];
   const startResearch = (sit: string, force = false) => {
     if (flow === "intrusive" || flow === "checkin") return;

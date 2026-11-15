@@ -7,18 +7,29 @@ A calm, guided companion for panic, racing thoughts and overwhelm, a voice diary
 ## Run
 ```bash
 npm install
-npm run migrate      # schema (migration 004 dropped the old safety-app tables)
-npm run audio        # optional: regenerate offline fallback audio
+npm run migrate      # schema, incl. accounts, therapy and layout tables
+npm run seed         # 5 demo profiles with dummy data (password: somewhere-demo)
+npm run ui:research  # optional: re-research layout settings per condition (Bright Data + Gemini)
+npm run audio        # optional: generate missing offline fallback audio
 npm run dev          # use Chrome: speech recognition needs it
 ```
-Uses the existing `.env.local` (`DATABASE_URL`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE`, `BRIGHTDATA_UNLOCKER_ZONE`, `CRON_SECRET`). No new variables. No Twilio, no SMS or voice APIs.
+Uses `.env.local` (`DATABASE_URL`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `GEMINI_API_KEY`, `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE`, `BRIGHTDATA_UNLOCKER_ZONE`, `CRON_SECRET`). The ElevenLabs key needs Text to Speech, Agents and Sound Effects permissions. No Twilio, no SMS or voice APIs.
+
+**Demo logins** (localhost only): `maya_ocd`, `jordan_panic`, `sam_burnout`, `riley_social`, `alex_new`. Password `somewhere-demo`.
 
 ## Pages
-- **In the Moment (`/`)**: tap what your body needs (panic, looping thoughts, sensory overwhelm), optionally where you are. A calm voice tells you what to do, step by step, with no questions. Side panels: *why this works right now* (with source and honest evidence strength), room anchors, live trusted sources, a technique chooser.
-- **Between Moments (`/between`)**: consented check-ins, what helps you, history, saved support, **Delete my data**.
-- **Voice Diary (`/diary`)**: you talk, it *listens* (a quiet "mm" on pauses, optional one-line reflections, no advice). It then shows "what I heard", you edit it, and save only if you want. Themes, feelings and intensity over time, stored in Neon. Not a chatbot.
-- **Find Care (`/care`)**: your city (or location), insurance, care type and budget. Bright Data reads public pages live, Gemini extracts, Neon stores. Every listing is labelled unverified, with the page's own wording, source and checked time, plus a copy-paste outreach message.
-- **Crisis Support (`/crisis`)**: 988, Crisis Text Line, Trevor Project, Veterans Crisis Line, international lines, and 3 grounding steps.
+The app opens on **/login** (account, guest, or demo profile). Everything else needs you to have entered.
+- **Today (`/`)**: greeting, a one-tap "how anxious are you" check, anything worth a look from your diary, and a short list.
+- **Talk (`/now`)**: pick what is happening; Juno, a live ElevenLabs voice agent (Gemini), talks with you and guides you. A scripted fallback guide runs if the live agent is unavailable.
+- **Diary (`/diary`)**: you talk, it listens. Each entry gets a risk level; worrying entries and trends show a card with 988, 911 and a note to copy for your therapist.
+- **Tracker (`/tracker`)**: OCD urges, panic episodes, daily mood, with insights.
+- **Therapy (`/therapy`)**: your plan, next session, "did you go?", what to bring, homework checklist, attendance.
+- **Find care (`/care`)**: city, insurance, care type. Bright Data reads public pages live, Gemini extracts, Neon stores. Every listing is labelled unverified, with an outreach script.
+- **You (`/you`)**: profile, layout settings with the reasons behind them, check-ins, saved support, **Delete my data**.
+- **Crisis (`/crisis`)**: static 988, 911 and other resources. Always reachable.
+
+## Layout per condition
+Each condition has defaults for spacing, movement, palette, text size and how much is on screen. `npm run ui:research` has Bright Data find public design guidance and Gemini summarise it into settings stored in Neon (`ui_profiles`). A palette only changes from the default if two sources agree. You can override anything on `/you`. This is design guidance, not medical advice.
 
 ## How the in-the-moment guidance works
 Browser mic (speech recognition) -> `POST /api/sos/turn` (state machine) -> streamed ElevenLabs TTS. Speaking over it cuts the audio instantly and it resumes from the exact sentence. Directive guidance in a human voice, moving through an evidence-based arc by itself (`docs/EVIDENCE.md`).
@@ -27,7 +38,7 @@ Browser mic (speech recognition) -> `POST /api/sos/turn` (state machine) -> stre
 - **Voices**: ElevenLabs Turbo v2.5, natural pace, next lines preloaded; presets and "a voice you trust" (cloning with consent, deleted at ElevenLabs when you delete). Offline fallback audio in `public/audio`.
 
 ## Privacy
-Anonymous device cookie, no accounts. No raw audio. No transcripts unless you turn on "keep the full transcript" for a diary entry. Preferences, check-ins and diary entries exist only after you choose them, and **Delete my data** removes everything.
+Anonymous device or a username and password account (no email). No raw audio. No transcripts unless you turn on "keep the full transcript" for a diary entry. Preferences, check-ins and diary entries exist only after you choose them, and **Delete my data** removes everything.
 
 ## Sponsors
 ElevenLabs (voice, barge-in, cloning) · Gemini (conversation, safety classification, extraction, reflection) · Neon (sessions, preferences, check-ins, diary, provider and technique directory) · Bright Data (live public research for techniques and care).

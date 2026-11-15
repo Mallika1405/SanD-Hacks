@@ -79,9 +79,12 @@ export async function researchTechniques(key: string, flow: string, sit: string,
 
 export type Sourced = Exercise & { source_url: string; source_name: string; db_id: string; why: string | null; anchors: string[] };
 
-export async function listSourced(key: string): Promise<Sourced[]> {
+export async function listSourced(key: string, alsoId?: string): Promise<Sourced[]> {
   const rows = await q<any>("SELECT * FROM techniques WHERE situation_key=$1 ORDER BY checked_at DESC LIMIT 8", [key]);
-  return rows.map((r) => ({
+  // Keep the technique in use even if newer research pushed it out of the top 8.
+  const keep = alsoId?.startsWith("src:") && !rows.some((r) => `src:${r.id}` === alsoId)
+    ? await q<any>("SELECT * FROM techniques WHERE id=$1", [alsoId.slice(4)]).catch(() => []) : [];
+  return [...rows, ...keep].map((r) => ({
     id: `src:${r.id}`, db_id: r.id, title: r.title, blurb: `From ${r.source_name}`, flows: [r.flow], status: "needs human review" as const, source_url: r.source_url, source_name: r.source_name, why: r.why ?? null, anchors: (r.anchors as string[]) ?? [],
     segments: [{ text: "Do exactly what I say, one step at a time.", pause_ms: 1500 }, ...(r.steps as any[])].map((s) => ({ text: s.text, pause_ms: s.pause_ms, ...(s.listen ? { listen: true } : {}) })),
   }));
