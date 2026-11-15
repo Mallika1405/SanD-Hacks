@@ -28,6 +28,8 @@ export default function Care() {
   const [goals, setGoals] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [online, setOnline] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [radius, setRadius] = useState<number | null>(25);
   const [insurance, setInsurance] = useState("");
   const [comfort, setComfort] = useState<string[]>([]);
   const [res, setRes] = useState<any>(null);
@@ -54,6 +56,7 @@ export default function Care() {
     if (!navigator.geolocation) return setErr("Your browser can't share location. Type your city instead.");
     setLocating(true); setErr("");
     navigator.geolocation.getCurrentPosition(async (p) => {
+      setCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
       const j = await fetch("/api/care/locate", { method: "POST", body: JSON.stringify({ lat: p.coords.latitude, lng: p.coords.longitude }) }).then((r) => r.json()).catch(() => ({}));
       if (j.city) setCity(j.city); else setErr("I couldn't work out your city. Please type it.");
       setLocating(false);
@@ -66,6 +69,7 @@ export default function Care() {
     gender: comfort.includes("Woman therapist") ? "Woman" : comfort.includes("Man therapist") ? "Man" : "No preference",
     extras: comfort.filter((c) => ["LGBTQ+ affirming", "Culturally specific", "Young adult / student"].includes(c)),
     format: online ? "online" : "either", modality, who: "individuals",
+    ...(coords && !online ? { lat: coords.lat, lng: coords.lng } : {}), ...(!online && radius ? { radius } : {}),
   });
 
   async function makeScript(name?: string) {
@@ -138,10 +142,12 @@ export default function Care() {
 
             {cur === "where" && <>
               <h1>Where are you?</h1>
-              <label className="block"><span className="text-[13.5px] text-ink2">City or ZIP</span><input value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} placeholder="e.g. San Diego, CA" autoFocus className="mt-1" /></label>
+              <label className="block"><span className="text-[13.5px] text-ink2">City or ZIP</span><input value={city} onChange={(e) => { setCity(e.target.value); setCoords(null); }} onKeyDown={(e) => e.key === "Enter" && next()} placeholder="e.g. San Diego, CA" autoFocus className="mt-1" /></label>
               <div className="flex flex-wrap gap-2"><button onClick={locate} disabled={locating} className="b b-soft border border-line">{locating ? "Finding you…" : "Use my location"}</button>
                 <button onClick={() => setOnline(!online)} aria-pressed={online} className="chip">Online only is fine</button></div>
-              <p className="text-[13px] text-ink2">Location is only used to find your city. It isn't stored.</p></>}
+              {!online && <div className="space-y-2"><p className="text-[14px] text-ink2">How far are you willing to go?</p>
+                <div className="flex flex-wrap gap-2">{([[5, "5 miles"], [10, "10 miles"], [25, "25 miles"], [50, "50 miles"], [0, "Any distance"]] as const).map(([v, l]) => <button key={v} className="chip" aria-pressed={(radius ?? 0) === v} onClick={() => setRadius(v || null)}>{l}</button>)}</div></div>}
+              <p className="text-[13px] text-ink2">Your location is used only for this search, to sort by distance. It isn't stored.</p></>}
 
             {cur === "pay" && <>
               <h1>How will you pay?</h1><p className="text-ink2 -mt-2">I'll look for pages that mention your plan. Skip if you're not sure.</p>
@@ -179,8 +185,10 @@ export default function Care() {
               {res.providers.map((p: any) => (
                 <article key={p.id} className="card p-4 space-y-2">
                   <div className="flex flex-wrap items-center gap-2"><h3 className="!text-[1.15rem]">{p.name}</h3>{p.credentials && <span className="tag tag-sage">{p.credentials}</span>}<span className="tag tag-stone">{p.is_individual ? "Therapist" : p.kind.replace("_", " ")}</span></div>
+                  {p.clinic && p.clinic !== p.name && <p className="text-[14.5px]"><span className="text-ink2">Works at </span><b>{p.clinic}</b></p>}
                   {p.specialties?.length > 0 && <p className="text-[14.5px]">{p.specialties.slice(0, 4).join(" · ")}</p>}
-                  <p className="text-[13.5px] text-ink2">{[p.location, p.telehealth === true ? "Online available" : null, p.insurance_match ? `Mentions ${payload().insurance || "your plan"}` : null].filter(Boolean).join(" · ") || "Location not stated"}</p>
+                  {p.address && <p className="text-[13.5px] text-ink2">{p.address} · <a className="underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`}>Directions</a></p>}
+                  <p className="text-[13.5px] text-ink2">{[p.distance_mi != null ? `${p.distance_mi} mi away` : null, p.location, p.telehealth === true ? "Online available" : null, p.insurance_match ? `Mentions ${payload().insurance || "your plan"}` : null].filter(Boolean).join(" · ") || "Location not stated"}</p>
                   <details className="text-[14px]"><summary className="cursor-pointer text-ink2 underline">What their page says</summary>
                     <div className="mt-2 space-y-1"><Field label="Insurance" text={p.insurance_text} /><Field label="Cost" text={p.cost_text} /><Field label="Availability" text={p.availability_text} />{p.quote && <p className="italic text-ink2">“{p.quote}”</p>}
                       <p className="text-[12.5px] text-ink2">Unverified. Source: <a className="underline" target="_blank" rel="noreferrer" href={p.source_url}>{host(p.source_url)}</a> · checked {ago(p.checked_at)}</p></div></details>

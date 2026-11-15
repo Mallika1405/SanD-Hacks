@@ -2,7 +2,7 @@ import { z } from "zod";
 import { q } from "@/lib/db";
 import { currentDevice } from "@/lib/device";
 import { brightEnabled } from "@/lib/brightdata";
-import { liveDiscover, rank, suggest } from "@/lib/care";
+import { geocode, liveDiscover, rank, suggest } from "@/lib/care";
 import { out } from "@/lib/speech";
 
 export const maxDuration = 60;
@@ -15,6 +15,7 @@ const Body = z.object({
   gender: z.string().max(30).default("No preference"),
   extras: z.array(z.string().max(60)).max(6).default([]),
   format: z.enum(["online", "in_person", "either"]).default("either"),
+  lat: z.number().min(-90).max(90).optional(), lng: z.number().min(-180).max(180).optional(), radius: z.number().min(1).max(100).optional(),
   who: z.enum(["individuals", "practices", "either"]).default("individuals"),
   modality: z.array(z.enum(["therapy", "groups", "psychiatry", "low_cost"])).default(["therapy", "groups"]),
 });
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
   if (!p.success) return new Response("bad request", { status: 400 });
   const device = await currentDevice();
   const flows = device ? (await q<{ flow: string }>("SELECT DISTINCT flow FROM sessions WHERE device_id=$1 AND flow NOT IN ('unsure','checkin') AND started_at > now() - interval '90 days'", [device])).map((r) => r.flow) : [];
+  // Distance needs a starting point: the shared location, or the middle of the city they typed.
+  if (p.data.lat == null && p.data.radius) { const g = await geocode(p.data.city); if (g) { p.data.lat = g.lat; p.data.lng = g.lng; } }
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {

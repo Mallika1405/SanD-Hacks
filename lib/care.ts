@@ -19,7 +19,7 @@ const queriesFor = (city: string) => [
 const EXTRACT_SYSTEM = `You extract mental-health care listings from ONE public web page. Return JSON {"providers":[...],"groups":[...]}.
 RULES: Use ONLY facts stated on the page. If a field is not stated use null (or [] for lists). NEVER guess insurance participation, price, availability or whether they are accepting clients: copy the page's own wording into insurance_text / cost_text / availability_text, otherwise null. Do not diagnose or recommend. At most 12 providers and 8 groups.
 A provider is either an INDIVIDUAL clinician (a named person: therapist, counselor, psychologist, psychiatrist) or an organization (practice, clinic, program, directory). If the page lists individual named clinicians, return each one as its own provider (up to 12 on a directory page); do not merge them into the practice. A group is a support or peer group (in person or online).
-provider = {"name","individual":boolean (true only for a named person),"credentials":string|null (as written, e.g. "LMFT", "PhD, Psychologist"),"kind":"therapist"|"clinic"|"low_cost"|"directory","specialties":[string],"modalities":[string],"location":string|null,"telehealth":boolean|null,"url":string|null,"insurance_text":string|null,"cost_text":string|null,"availability_text":string|null,"notes":string|null,"quote":string}
+provider = {"name","individual":boolean (true only for a named person),"credentials":string|null (as written, e.g. "LMFT", "PhD, Psychologist"),"clinic":string|null (the practice, clinic, group or organization this person works for, if the page says so),"address":string|null (street address with city and state, exactly as written, only if the page gives one),"kind":"therapist"|"clinic"|"low_cost"|"directory","specialties":[string],"modalities":[string],"location":string|null,"telehealth":boolean|null,"url":string|null,"insurance_text":string|null,"cost_text":string|null,"availability_text":string|null,"notes":string|null,"quote":string}
 group = {"name","kind":"support_group"|"peer","topics":[string],"format":"online"|"in_person"|"hybrid"|null,"schedule_text":string|null,"cost_text":string|null,"url":string|null,"notes":string|null,"quote":string}
 notes = languages, populations served or stated therapist gender if stated. quote = a short phrase (max 160 chars) copied from the page that supports the listing.`;
 
@@ -38,11 +38,11 @@ export async function ingestPage(pageUrl: string): Promise<{ providers: number; 
     if (!x?.name) continue;
     const conf = Math.min(0.6, 0.3 + (x.location ? 0.1 : 0) + (x.url ? 0.1 : 0) + (x.quote ? 0.1 : 0));
     await q(
-      `INSERT INTO providers(name,kind,specialties,modalities,location,telehealth,url,insurance_text,cost_text,availability_text,notes,quote,source_url,checked_at,verified,confidence,is_individual,credentials)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),false,$14,$15,$16)
-       ON CONFLICT (source_url,name) DO UPDATE SET kind=$2,specialties=$3,modalities=$4,location=$5,telehealth=$6,url=$7,insurance_text=$8,cost_text=$9,availability_text=$10,notes=$11,quote=$12,checked_at=now(),confidence=$14,is_individual=$15,credentials=$16`,
+      `INSERT INTO providers(name,kind,specialties,modalities,location,telehealth,url,insurance_text,cost_text,availability_text,notes,quote,source_url,checked_at,verified,confidence,is_individual,credentials,clinic,address)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),false,$14,$15,$16,$17,$18)
+       ON CONFLICT (source_url,name) DO UPDATE SET kind=$2,specialties=$3,modalities=$4,location=$5,telehealth=$6,url=$7,insurance_text=$8,cost_text=$9,availability_text=$10,notes=$11,quote=$12,checked_at=now(),confidence=$14,is_individual=$15,credentials=$16,clinic=COALESCE($17,providers.clinic),address=COALESCE($18,providers.address),geo_tried=CASE WHEN $18 IS DISTINCT FROM providers.address THEN false ELSE providers.geo_tried END`,
       [str(x.name, 160), ["therapist", "clinic", "low_cost", "directory"].includes(x.kind) ? x.kind : "therapist", arr(x.specialties), arr(x.modalities), str(x.location, 160),
-        typeof x.telehealth === "boolean" ? x.telehealth : null, abs(x.url, pageUrl), str(x.insurance_text), str(x.cost_text), str(x.availability_text), str(x.notes), str(x.quote, 200), pageUrl, conf, x.individual === true, str(x.credentials, 80)]);
+        typeof x.telehealth === "boolean" ? x.telehealth : null, abs(x.url, pageUrl), str(x.insurance_text), str(x.cost_text), str(x.availability_text), str(x.notes), str(x.quote, 200), pageUrl, conf, x.individual === true, str(x.credentials, 80), str(x.clinic, 140), str(x.address, 200)]);
     p++;
   }
   for (const x of (ex.groups ?? []).slice(0, 8)) {
@@ -82,10 +82,44 @@ export async function discover(city: string, opts: { maxPages?: number; log?: (s
   return { searched: queriesFor(city).length, pages: todo.length, ok, providers, groups };
 }
 
+
+/* ---------------------------------------------------------------- distance */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Public business addresses and city names only (never the person's own location) go to OpenStreetMap's free geocoder. */
+export async function geocode(text: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(text)}`, { headers: { "User-Agent": "somewhere-demo" }, signal: AbortSignal.timeout(6000) });
+    const j = await r.json();
+    return j?.[0] ? { lat: Number(j[0].lat), lng: Number(j[0].lon) } : null;
+  } catch { return null; }
+}
+export const miles = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const R = 3958.8, rad = (x: number) => (x * Math.PI) / 180, dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+/** Street addresses on practice pages often carry suites and extra locations, which the geocoder chokes on. */
+const cleanAddr = (a: string) => a.split(/;|\bor\b/i)[0].replace(/#\s*\w+|\b(ste|suite|unit|apt|floor|fl)\.?\s*[\w-]+/gi, " ").replace(/\s*,\s*,/g, ",").replace(/\s+/g, " ").replace(/\s+,/g, ",").trim();
+const cityZip = (a: string) => { const m = a.match(/([A-Za-z .'-]+),?\s+([A-Z]{2})\s+(\d{5})/); return m ? `${m[3]}, ${m[2]}` : null; };
+/** Looks up coordinates for listings that have an address, one per second (the geocoder's rule). */
+export async function geocodePending(max = 8) {
+  const rows = await q<any>("SELECT id, address FROM providers WHERE address IS NOT NULL AND lat IS NULL AND geo_tried = false ORDER BY checked_at DESC LIMIT $1", [max]);
+  const seen = new Map<string, { lat: number; lng: number } | null>();
+  for (const r of rows) {
+    const key = String(r.address).toLowerCase().replace(/\s+/g, " ").trim();
+    let g = seen.has(key) ? seen.get(key)! : await geocode(cleanAddr(r.address));
+    if (!g && !seen.has(key)) { const z = cityZip(r.address); if (z) { await sleep(1100); g = await geocode(z); } }
+    const fresh = !seen.has(key); seen.set(key, g);
+    await q("UPDATE providers SET lat=$2, lng=$3, geo_tried=true WHERE id=$1", [r.id, g?.lat ?? null, g?.lng ?? null]);
+    if (fresh) await sleep(1100);
+  }
+  return rows.length;
+}
+
 /* ---------------------------------------------------------------- matching (cache only) */
 
 export type Answers = {
-  city: string; goals: string[]; budget: "free" | "low" | "flexible"; insurance: string; modality: ("therapy" | "groups" | "psychiatry" | "low_cost")[]; language: string; gender: string; extras: string[]; format: "online" | "in_person" | "either"; who?: "individuals" | "practices" | "either";
+  city: string; goals: string[]; budget: "free" | "low" | "flexible"; insurance: string; modality: ("therapy" | "groups" | "psychiatry" | "low_cost")[]; language: string; gender: string; extras: string[]; format: "online" | "in_person" | "either"; who?: "individuals" | "practices" | "either"; lat?: number; lng?: number; radius?: number;
 };
 
 const FALLBACK: Record<string, { name: string; why: string; terms: string[] }> = {
@@ -137,12 +171,24 @@ export async function rank(answers: Answers, specialties: Spec[]) {
     if (answers.format === "online" && !online && p.telehealth === false) sc -= 2;
     const im = mentions(p); if (im) sc += 3;
     if (!m.includes("psychiatry") && /psychiatr|medication management/i.test(p.name + " " + (p.specialties ?? []).join(" "))) sc -= 4;
+    let dist: number | null = null;
+    if (answers.lat != null && answers.lng != null && p.lat != null && p.lng != null) dist = miles({ lat: answers.lat, lng: answers.lng }, { lat: p.lat, lng: p.lng });
+    if (dist != null && answers.radius && dist > answers.radius && !(online && answers.format !== "in_person")) return { p: { ...p, insurance_match: im, distance_mi: Math.round(dist * 10) / 10 }, sc: 0 };
+    if (dist != null) sc += Math.max(0, 6 - dist / Math.max(1, (answers.radius ?? 25) / 6));
+    else if (answers.radius && !(online && answers.format !== "in_person")) {
+      // No coordinates yet: if the listing names a place and it isn't the searched city, it is almost certainly too far.
+      const where = hay(p.address, p.location);
+      if (where && !where.includes(city)) return { p: { ...p, insurance_match: im, distance_mi: null }, sc: 0 };
+    }
+    (p as any)._dist = dist;
     const who = answers.who ?? "individuals";
     if (who === "individuals" && !p.is_individual) return { p: { ...p, insurance_match: im }, sc: 0 };
     if (who === "practices" && p.is_individual) return { p: { ...p, insurance_match: im }, sc: 0 };
     if (who !== "practices" && p.is_individual) sc += 2;
-    return { p: { ...p, insurance_match: im }, sc };
-  }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 10).map((x) => x.p);
+    return { p: { ...p, insurance_match: im, distance_mi: dist != null ? Math.round(dist * 10) / 10 : null }, sc };
+  }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 10).map((x) => x.p)
+    // Near me: closest first, listings without a known distance last.
+    .sort((a: any, b: any) => (answers.lat != null ? (a.distance_mi ?? 1e6) - (b.distance_mi ?? 1e6) : 0));
 
   const groups = grp.map((g: any) => {
     const t = hay(g.name, g.topics, g.notes, g.quote);
@@ -227,5 +273,6 @@ export async function liveDiscover(answers: Answers, specs: Spec[], emit: (e: an
     }
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
+  if (answers.lat != null) { emit({ type: "status", text: "Working out how far each one is…" }); await geocodePending(16); emit({ type: "results", ...(await rank(answers, specs)) }); }
   emit({ type: "status", text: queue.length ? `Stopped early to keep this quick. Read ${done} of ${todo.length} pages.` : `Done. Read ${done} pages.` });
 }
