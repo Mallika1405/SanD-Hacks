@@ -204,7 +204,9 @@ export async function liveDiscover(answers: Answers, specs: Spec[], emit: (e: an
   const t0 = Date.now();
   const queries = liveQueries(answers, specs);
   emit({ type: "status", text: `Searching the web for ${queries.length} kinds of support near ${answers.city}…` });
-  const hitLists = await Promise.all(queries.map((qq) => serpLinks(qq, 3).catch(() => [])));
+  // A few at a time: firing every search at once makes the search API reply "busy".
+  const hitLists: Awaited<ReturnType<typeof serpLinks>>[] = [];
+  for (let i = 0; i < queries.length; i += 3) hitLists.push(...(await Promise.all(queries.slice(i, i + 3).map((qq) => serpLinks(qq, 3).catch(() => [])))));
   const urls: string[] = [];
   for (const h of hitLists.flat()) { try { if (!SKIP_HOSTS.test(new URL(h.url).hostname) && !urls.includes(h.url)) urls.push(h.url); } catch {} }
   const recent = new Set((await q<{ source_url: string }>(`SELECT source_url FROM providers WHERE checked_at > now() - interval '12 hours' UNION SELECT source_url FROM groups WHERE checked_at > now() - interval '12 hours'`)).map((r) => r.source_url));
