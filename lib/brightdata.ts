@@ -39,10 +39,13 @@ async function resolveRedirect(link: string): Promise<string | null> {
 /** Google results as real URLs (parsed JSON via brd_json=1). Retries with a short backoff: the API sometimes replies empty or says it is busy. */
 export async function serpLinks(query: string, limit = 5): Promise<SerpHit[]> {
   const zone = process.env.BRIGHTDATA_SERP_ZONE || "serp_api1";
+  // If the search API says this exact query "recently failed" (it blocks repeats for 15 seconds), retry a lightly reworded version instead of waiting.
+  const variants = [query, `${query} best`, `${query} near me`];
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt) await new Promise((r) => setTimeout(r, 900 * attempt));
+    if (attempt) await new Promise((r) => setTimeout(r, 700 * attempt));
+    const q = variants[attempt];
     try {
-      const txt = await bd({ zone, url: `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en&gl=us&brd_json=1` }, 40000);
+      const txt = await bd({ zone, url: `https://www.google.com/search?q=${encodeURIComponent(q)}&hl=en&gl=us&brd_json=1` }, 40000);
       let j: any;
       try { j = JSON.parse(txt); } catch { console.error("serp non-JSON reply:", txt.slice(0, 120)); continue; }
       const hits: SerpHit[] = [];

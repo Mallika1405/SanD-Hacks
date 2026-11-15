@@ -143,11 +143,11 @@ export default function Care() {
             {cur === "where" && <>
               <h1>Where are you?</h1>
               <label className="block"><span className="text-[13.5px] text-ink2">City or ZIP</span><input value={city} onChange={(e) => { setCity(e.target.value); setCoords(null); }} onKeyDown={(e) => e.key === "Enter" && next()} placeholder="e.g. San Diego, CA" autoFocus className="mt-1" /></label>
-              <div className="flex flex-wrap gap-2"><button onClick={locate} disabled={locating} className="b b-soft border border-line">{locating ? "Finding you…" : "Use my location"}</button>
+              <div className="flex flex-wrap gap-2"><button onClick={locate} disabled={locating} className="b b-soft border border-line">{locating ? "Waiting for your browser…" : coords ? "✓ Using your location" : "Use my location"}</button>
                 <button onClick={() => setOnline(!online)} aria-pressed={online} className="chip">Online only is fine</button></div>
               {!online && <div className="space-y-2"><p className="text-[14px] text-ink2">How far are you willing to go?</p>
                 <div className="flex flex-wrap gap-2">{([[5, "5 miles"], [10, "10 miles"], [25, "25 miles"], [50, "50 miles"], [0, "Any distance"]] as const).map(([v, l]) => <button key={v} className="chip" aria-pressed={(radius ?? 0) === v} onClick={() => setRadius(v || null)}>{l}</button>)}</div></div>}
-              <p className="text-[13px] text-ink2">Your location is used only for this search, to sort by distance. It isn't stored.</p></>}
+              <p className="text-[13px] text-ink2">{coords ? `Using your current position${city ? ` (${city})` : ""}. ` : "Your browser will ask for permission when you tap Use my location. "}It's used only for this search, to sort by distance, and isn't stored.</p></>}
 
             {cur === "pay" && <>
               <h1>How will you pay?</h1><p className="text-ink2 -mt-2">I'll look for pages that mention your plan. Skip if you're not sure.</p>
