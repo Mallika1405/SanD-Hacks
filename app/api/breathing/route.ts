@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { out, Seg } from "@/lib/speech";
 
 const br = (ms: number) => `<break time="${ms / 1000}s" />`;
+// What to feel during each breath out, so the voice keeps guiding the whole way through and not only counting.
+const OUT = [
+  (b: (n: number) => string) => `Now out, slowly, through your mouth. ${b(600)} Two. ${b(500)} Let your shoulders drop. ${b(600)} Three. ${b(600)} Four. ${b(500)} Feel your jaw soften. ${b(600)} Five. ${b(650)} Six. ${b(650)} Seven.`,
+  (b: (n: number) => string) => `Now out, slowly. ${b(600)} Two. ${b(500)} Feel your hands get heavy. ${b(600)} Three. ${b(600)} Four. ${b(500)} Let your belly go soft. ${b(600)} Five. ${b(650)} Six. ${b(650)} Seven.`,
+  (b: (n: number) => string) => `And out, slowly. ${b(600)} Two. ${b(500)} Feel your feet on the floor. ${b(600)} Three. ${b(600)} Four. ${b(500)} Let the thoughts drift past. ${b(600)} Five. ${b(650)} Six. ${b(650)} Seven.`,
+  (b: (n: number) => string) => `And out, slowly. ${b(600)} Two. ${b(500)} Notice where your body is held up by the chair. ${b(600)} Three. ${b(600)} Four. ${b(600)} Five. ${b(650)} Six. ${b(650)} Seven.`,
+];
+const IN = [
+  (b: (n: number) => string) => `Breathe in through your nose. ${b(700)} Two. ${b(600)} Three. ${b(600)} Four. ${b(500)} And one more small sip of air.`,
+  (b: (n: number) => string) => `In through your nose. ${b(700)} Two. ${b(600)} Feel your belly rise. ${b(600)} Three. ${b(600)} Four. ${b(500)} One more small sip.`,
+  (b: (n: number) => string) => `In through your nose. ${b(700)} Two. ${b(600)} Three. ${b(600)} Four. ${b(500)} A little more.`,
+  (b: (n: number) => string) => `In, gently. ${b(700)} Two. ${b(600)} Three. ${b(600)} Four. ${b(500)} A last small sip.`,
+];
 const CUES = [
   "Good. Let your shoulders get a little heavier.",
   "That's it. Your breath is already starting to slow.",
@@ -22,8 +35,8 @@ export async function GET(req: Request) {
     st("When I say in, breathe in through your nose. When I say out, let it go slowly through your mouth. Here we go.", 1500, "Settle in", 4000, 1),
   ];
   for (let r = 1; r <= rounds; r++) {
-    steps.push(st(`Breathe in through your nose. ${br(700)} Two. ${br(600)} Three. ${br(600)} Four. ${br(500)} And one more small sip of air.`, 250, "Breathe in", 4200, 1.16));
-    steps.push(st(`Now out, slowly, through your mouth. ${br(600)} Two. ${br(650)} Three. ${br(650)} Four. ${br(650)} Five. ${br(650)} Six. ${br(650)} Seven.`, 900, "Slowly out", 7500, 0.86));
+    steps.push(st(IN[(r - 1) % IN.length](br), 250, "Breathe in", 4200, 1.16));
+    steps.push(st(OUT[(r - 1) % OUT.length](br), 900, "Slowly out", 8500, 0.86));
     if (r < rounds) steps.push(st(r % 2 === 1 ? `${CUES[(r - 1) % CUES.length]}` : "Again.", 700, `Round ${r + 1}`, 2500, 1));
   }
   steps.push(

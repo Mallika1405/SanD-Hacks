@@ -146,13 +146,14 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
       const b64 = (t: string) => { const b = new TextEncoder().encode(t); let x = ""; b.forEach((c) => (x += String.fromCharCode(c))); return btoa(x).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
       const urls: string[] = plan.segments.map((sg: any) => `/api/sos/tts?t=${b64(sg.text)}&s=${sg.sig}&v=${voice}`);
       stopBreath.current = false; setBreathing(true); setPacer(null);
+      if (p?.fromButton) { try { (conv as any).sendContextualUpdate("The person tapped a button to start a guided breathing exercise on screen. Stay completely silent until it ends."); } catch {} }
       try { (conv as any).setMuted(true); } catch {}
       const preload = (u: string) => { const a = new Audio(u); a.preload = "auto"; return a; };
       let next: HTMLAudioElement | null = preload(urls[0]);
       const t0 = Date.now(), last = plan.segments.length - 2;
       for (let i = 0; i < plan.segments.length && !stopBreath.current; i++) {
         // The voice service stops waiting for a tool after 2 minutes, so if we are running long, jump to the closing words.
-        if (Date.now() - t0 > 95000 && i < last) { i = last; next = preload(urls[i]); }
+        if (Date.now() - t0 > 88000 && i < last) { i = last; next = preload(urls[i]); }
         const sg = plan.segments[i], a = next!;
         next = i + 1 < urls.length ? preload(urls[i + 1]) : null;
         setPhase(sg.phase);
@@ -162,6 +163,7 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
       const stopped = stopBreath.current;
       setPhase(null); setBreathing(false);
       try { (conv as any).setMuted(muted); } catch {}
+      if (p?.fromButton) { try { (conv as any).sendUserMessage(stopped ? "I stopped the breathing exercise early." : "I finished the breathing exercise."); } catch {} }
       return stopped ? "They stopped the breathing walkthrough early. Ask nothing; say one gentle sentence and offer something different." : `The full ${rounds}-round breathing walkthrough just finished. Say one calm sentence noticing that they stayed with it, then continue. Do not ask a question.`;
     },
   };
@@ -224,7 +226,8 @@ function Inner({ sessionId, mode, onExit, onFallback }: { sessionId: string; mod
         </div>
         {err && <p role="alert" className="text-terra text-center text-[14.5px]">{err} <button onClick={connect} className="underline">Try again</button></p>}
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        {!breathing && <button onClick={() => h.current.breathe({ fromButton: true })} disabled={conv.status !== "connected"} className="b b-primary w-full mt-4">Walk me through breathing</button>}
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <button onClick={toggleMute} aria-pressed={muted} className={`b !px-2 text-[14px] ${muted ? "b-primary" : "b-soft"}`}>{muted ? "Unmute me" : "Mute my mic"}</button>
           <button onClick={() => say("Please slow down a little.")} className="b b-soft !px-2 text-[14px]">Slow down</button>
           <button onClick={() => say("Can we try something different?")} className="b b-soft !px-2 text-[14px]">Something else</button>
