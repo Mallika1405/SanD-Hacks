@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Count } from "@/components/Motion";
+import { Count, Skeleton, Steps, toast, useDir } from "@/components/Motion";
 
 type Kind = "ocd_urge" | "panic_episode" | "daily";
 const TABS: { id: Kind; label: string; sub: string }[] = [
@@ -33,6 +33,7 @@ export default function Tracker() {
   const [data, setData] = useState<{ logs: any[]; insights: any } | null>(null);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   const [logging, setLogging] = useState(false); const [step, setStep] = useState(0);
+  const dir = useDir(step);
   // ocd
   const [trigger, setTrigger] = useState<string | null>(null); const [urge, setUrge] = useState<string | null>(null); const [resp, setResp] = useState<"did" | "delayed" | "resisted" | null>(null);
   const [wait, setWait] = useState<number | null>(null); const [before, setBefore] = useState(6); const [after, setAfter] = useState(4); const [note, setNote] = useState("");
@@ -60,7 +61,7 @@ export default function Tracker() {
     setBusy(false);
     if (!r.ok) return setErr("I couldn't save that. Please try again.");
     setMsg(kind === "ocd_urge" ? (resp === "did" ? "Logged. That's okay. Noticing it is part of the work, and tomorrow is a fresh try." : resp === "delayed" ? "Logged. Waiting, even a little, is the skill." : "Logged. Resisting is hard. That took effort.") : "Logged.");
-    setTrigger(null); setUrge(null); setResp(null); setWait(null); setNote(""); setHelped([]); setLogging(false); setStep(0); load(kind);
+    toast("Logged"); setTrigger(null); setUrge(null); setResp(null); setWait(null); setNote(""); setHelped([]); setLogging(false); setStep(0); load(kind);
   }
   async function del(id: string) { if (!confirm("Delete this entry?")) return; await fetch(`/api/tracker?id=${id}`, { method: "DELETE" }); load(kind); }
 
@@ -86,7 +87,7 @@ export default function Tracker() {
       ) : (
         <section className="space-y-5" aria-label="Log an entry">
           <div className="flex items-center gap-3"><div className="flex-1 h-1.5 rounded-full bg-stone overflow-hidden"><div className="h-full bg-sage transition-all duration-500" style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div><span className="text-[13px] text-ink2">{step + 1} of {steps.length}</span></div>
-          <div key={cur} className="step-in space-y-4 min-h-[240px]">
+          <Steps id={cur} dir={dir} className="step-in space-y-4 min-h-[240px]">
             {cur === "trigger" && <><Q>What set it off?</Q><Chips opts={TRIGGERS} val={trigger} onPick={setTrigger} /></>}
             {cur === "urge" && <><Q>What did the urge tell you to do?</Q><Chips opts={URGES} val={urge} onPick={setUrge} /></>}
             {cur === "resp" && <><Q>What did you do?</Q>
@@ -95,7 +96,7 @@ export default function Tracker() {
             {cur === "wait" && <><Q>How long did you wait?</Q><Chips opts={WAITS.map((w) => `${w} min`)} val={wait ? `${wait} min` : null} onPick={(v) => setWait(v ? parseInt(v) : null)} /></>}
             {cur === "before" && <><Q>How distressing was it before?</Q><Slider label="Before" v={before} set={setBefore} /></>}
             {cur === "after" && <><Q>And after?</Q><Slider label="After" v={after} set={setAfter} /></>}
-            {cur === "note" && <><Q>Anything you want to remember?</Q><p className="text-ink2 text-[14px] -mt-2">Optional.</p><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={240} aria-label="Note" /></>}
+            {cur === "note" && <><Q>Anything you want to remember?</Q><label className="block"><span className="text-[13.5px] text-ink2">Optional note</span><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={240} className="mt-1" /></label></>}
             {cur === "intensity" && <><Q>How intense did it get?</Q><Slider label="Intensity" v={intensity} set={setIntensity} /></>}
             {cur === "mins" && <><Q>About how long did it last?</Q><Chips opts={MIN_OPTS.map((m) => `${m} min`)} val={mins ? `${mins} min` : null} onPick={(v) => setMins(v ? parseInt(v) : null)} /></>}
             {cur === "ptrig" && <><Q>Any trigger?</Q><Chips opts={P_TRIG} val={pTrig} onPick={setPTrig} /></>}
@@ -104,7 +105,7 @@ export default function Tracker() {
             {cur === "anx" && <><Q>How anxious are you today?</Q><Slider label="Anxiety" v={anx} set={setAnx} /></>}
             {cur === "sleep" && <><Q>How did you sleep?</Q><Chips opts={SLEEP} val={sleep} onPick={setSleep} /></>}
             {err && <p role="alert" className="text-terra text-[14.5px]">{err}</p>}
-          </div>
+          </Steps>
           <div className="flex items-center justify-between">
             <button onClick={() => (step === 0 ? setLogging(false) : setStep(step - 1))} className="b b-ghost">{step === 0 ? "Cancel" : "Back"}</button>
             <button onClick={nextStep} disabled={busy || need} className="b b-primary px-7">{step >= steps.length - 1 ? (busy ? "Saving…" : "Save") : "Next"}</button>
@@ -119,7 +120,7 @@ export default function Tracker() {
         <div className="space-y-6">
           <article className="card p-6 space-y-4">
             <h2 className="text-[1.6rem]">Over time</h2>
-            {!data && <p className="text-ink2">Loading…</p>}
+            {!data && <Skeleton lines={4} />}
             {data && !I.total && <p className="text-[14.5px] text-ink2">Nothing logged yet. Your first entry starts the picture.</p>}
             {data && I.total > 0 && kind === "ocd_urge" && (
               <>

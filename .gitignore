@@ -43,3 +43,6 @@ next-env.d.ts
 !.env.example
 
 .next-test
+
+# third-party skills copied locally
+.claude/skills/

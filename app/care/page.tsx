@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { Steps, toast, useDir } from "@/components/Motion";
 
 type Mod = "therapy" | "groups" | "psychiatry" | "low_cost";
 const GOALS = ["Panic attacks", "Unwanted thoughts", "Feeling overwhelmed", "Stress", "Feeling low", "Someone to talk to regularly"];
@@ -38,6 +39,7 @@ export default function Care() {
   const [locating, setLocating] = useState(false);
   const [script, setScript] = useState("");
   const top = useRef<HTMLDivElement | null>(null);
+  const dir = useDir(step);
 
   const needsTherapist = want !== "group";
   const order = needsTherapist ? ["want", "goals", "where", "pay", "comfort"] : ["want", "goals", "where"];
@@ -102,9 +104,9 @@ export default function Care() {
   }
   async function save() {
     await fetch("/api/care/save", { method: "POST", body: JSON.stringify({ providerIds: res.providers.map((p: any) => p.id), groupIds: res.groups.map((g: any) => g.id) }) });
-    setMsg("Saved on this device. You can remove it any time from You.");
+    setMsg("Saved on this device. You can remove it any time from You."); toast("Saved to your list");
   }
-  async function copy(t: string) { try { await navigator.clipboard.writeText(t); setMsg("Copied."); } catch { setMsg("Couldn't copy. You can select the text instead."); } }
+  async function copy(t: string) { try { await navigator.clipboard.writeText(t); setMsg("Copied."); toast("Copied"); } catch { setMsg("Couldn't copy. You can select the text instead."); } }
 
   const Opt = ({ on, onClick, title, sub }: { on: boolean; onClick: () => void; title: string; sub?: string }) => (
     <button onClick={onClick} aria-pressed={on} className={`w-full text-left rounded-xl border px-4 py-3.5 transition ${on ? "border-sage bg-mint/40" : "border-line bg-linen hover:border-sage/50"}`}><span className="block font-medium">{title}</span>{sub && <span className="block text-[13.5px] text-ink2">{sub}</span>}</button>
@@ -120,7 +122,7 @@ export default function Care() {
             <span className="text-[13px] text-ink2">{step + 1} of {order.length}</span>
           </div>
 
-          <div key={cur} className="step-in space-y-5 min-h-[300px]">
+          <Steps id={cur} dir={dir} className="step-in space-y-5 min-h-[300px]">
             {cur === "want" && <>
               <h1>What kind of support are you looking for?</h1>
               <div className="space-y-2.5">
@@ -136,7 +138,7 @@ export default function Care() {
 
             {cur === "where" && <>
               <h1>Where are you?</h1>
-              <input value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} placeholder="City or ZIP, e.g. San Diego, CA" aria-label="City or ZIP" autoFocus />
+              <label className="block"><span className="text-[13.5px] text-ink2">City or ZIP</span><input value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={(e) => e.key === "Enter" && next()} placeholder="e.g. San Diego, CA" autoFocus className="mt-1" /></label>
               <div className="flex flex-wrap gap-2"><button onClick={locate} disabled={locating} className="b b-soft border border-line">{locating ? "Finding you…" : "Use my location"}</button>
                 <button onClick={() => setOnline(!online)} aria-pressed={online} className="chip">Online only is fine</button></div>
               <p className="text-[13px] text-ink2">Location is only used to find your city. It isn't stored.</p></>}
@@ -150,7 +152,7 @@ export default function Care() {
               <div className="flex flex-wrap gap-2">{COMFORT.map((p) => <button key={p} className="chip" aria-pressed={comfort.includes(p)} onClick={() => toggle(comfort, p, setComfort)}>{p}</button>)}</div></>}
 
             {err && <p role="alert" className="text-terra text-[14.5px]">{err}</p>}
-          </div>
+          </Steps>
 
           {cur !== "want" && (
             <div className="flex items-center justify-between">

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Skeleton, toast as notify } from "@/components/Motion";
 
 type Seg = { text: string; pause_ms: number; sig: string };
 type Msg = { role: "user" | "assistant"; text: string };
@@ -50,7 +51,7 @@ export default function Diary() {
   }, [load]);
   useEffect(() => { thread.current?.scrollTo({ top: 1e6, behavior: "smooth" }); }, [msgs, interim, busy]);
 
-  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 4000); };
+  const flash = (m: string) => { notify(m); setToast(m); setTimeout(() => setToast(""), 4000); };
 
   /* ---- speech recognition (voice mode): sends after a natural pause ---- */
   const stopRec = () => { try { rec.current?.stop(); } catch {} rec.current = null; };
@@ -246,7 +247,7 @@ export default function Diary() {
 
       <section className="space-y-4" aria-label="Past entries">
         <h2 className="text-[1.5rem]">Your entries</h2>
-        {!data && <p className="text-ink2">Loading…</p>}
+        {!data && <Skeleton lines={3} />}
         {data && !data.entries.length && <p className="card-flat p-5 text-ink2">Nothing saved yet. When you're ready, tap Talk to me or Write instead.</p>}
         <div className="space-y-3">
           {data?.entries.map((e) => (

@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Skeleton, toast } from "@/components/Motion";
 
 const PROMPT = "Read this out loud, slowly, in the voice you'd like to hear: “Take a slow breath in. And let it out. You're here, and you're okay in this moment. Let your shoulders drop a little. Feel your feet on the floor. There's no rush. We can take this one breath at a time.”";
 
 export default function Voice() {
   const [d, setD] = useState<any>(null);
   const [playing, setPlaying] = useState("");
-  const [saved, setSaved] = useState("");
+  const [saved, setSavedRaw] = useState("");
+  const setSaved = (m: string) => { setSavedRaw(m); if (m) toast(m); };
   const [err, setErr] = useState("");
   const [name, setName] = useState("");
   const [consent, setConsent] = useState(false);
@@ -68,7 +70,7 @@ export default function Voice() {
     <main className="max-w-[820px] space-y-6 fade-in">
       <div><h1 className="text-[1.8rem]">Voices</h1>
         <p className="mt-1 text-ink2">Pick a voice that settles you. You can use one voice for everything, or a different one for Juno, the guided exercises and the diary.</p></div>
-      {!d && <p className="text-ink2">Loading…</p>}
+      {!d && <Skeleton lines={4} />}
 
       {d?.suggested && A.companion !== d.suggested.id && (
         <section className="card p-4 flex flex-wrap items-center justify-between gap-3" aria-label="Suggested voice">
