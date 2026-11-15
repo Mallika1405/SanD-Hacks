@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "migrate": "tsx scripts/migrate.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "audio": "tsx scripts/gen-audio.ts",
+    "test:agent": "tsx scripts/test-agent.ts"
   },
   "dependencies": {
     "@google/genai": "^3.3.0",
