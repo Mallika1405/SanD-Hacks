@@ -75,7 +75,7 @@ export default function Care() {
   async function makeScript(name?: string) {
     const kind = want === "group" ? "groups" : "therapy";
     const r = await fetch("/api/care/script", { method: "POST", body: JSON.stringify({ insurance: payload().insurance, kind, focus: (goals[0] ?? "anxiety").toLowerCase(), budget, name }) }).then((x) => x.json()).catch(() => null);
-    if (r?.text) setScript(r.text);
+    if (r?.text) { setScript(r.text); if (name) { toast(`Message for ${name} is ready`); setTimeout(() => document.getElementById("outreach")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80); } }
   }
 
   async function run() {
@@ -231,8 +231,8 @@ export default function Care() {
           )}
 
           {(script || !working) && (
-            <article className="card-flat p-5 space-y-3"><h3>Not sure what to say?</h3>
-              <p className="text-[14px] text-ink2">You don't have to tell your story in the first message. Paste this into an email, or read it as a voicemail.</p>
+            <article id="outreach" className="card-flat p-5 space-y-3"><h3>Not sure what to say?</h3>
+              <p className="text-[14px] text-ink2">You don't have to tell your story in the first message. Paste this into an email or their contact form, or read it as a voicemail. Nothing is sent from here.</p>
               <div className="rounded-xl border border-line p-4 text-[15px] leading-relaxed bg-linen">{script || "Writing a message for you…"}</div>
               <div className="flex flex-wrap gap-2"><button onClick={() => copy(script)} disabled={!script} className="b b-soft border border-line">Copy message</button><button onClick={save} className="b b-soft border border-line">Save this list</button></div>
               {msg && <p role="status" className="text-sage text-sm">{msg}</p>}</article>
