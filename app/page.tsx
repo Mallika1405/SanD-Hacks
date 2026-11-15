@@ -74,7 +74,7 @@ export default function Today() {
 
   return (
     <div className="max-w-[640px] mx-auto space-y-9">
-      <section className="hero">
+      <section className="hero !grid-cols-1">
         <div>
           <p className="text-[13.5px] text-ink2 font-semibold tracking-wide uppercase">{new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</p>
           <h1 className="mt-2">{hello}{name ? <>,<br />{name}.</> : "."}</h1>
@@ -82,8 +82,13 @@ export default function Today() {
             {!me ? " " : mood != null && mood >= 3 ? "That sounds like a lot right now. I'm here if you want company." : signal ? "I noticed something in your diary I'd like to check in about." : plan?.next_at ? `Your next session is ${day(plan.next_at)}, ${inDays(plan.next_at)}.` : personaFor(conds).todayLine}
           </p>
         </div>
-        <Link href="/now?sos=1" className="orb-btn" aria-label="I need a hand right now. Start a guided moment with Juno."><span className="px-3 leading-tight">I need a hand<br />right now</span></Link>
-      </section>
+</section>
+
+      <Link href="/now?sos=1" className="help-cta" aria-label="I need a hand right now. Start a guided moment with Juno.">
+        <span className="ico" aria-hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z" /></svg></span>
+        <span className="flex-1"><span className="block text-[17px] font-bold">I need a hand right now</span><span className="block text-[14px] opacity-85">Juno will talk you through it, step by step</span></span>
+        <span aria-hidden className="text-xl">→</span>
+      </Link>
 
       <section aria-label="How anxious are you right now" className="space-y-3">
         <h2>How anxious are you right now?</h2>
