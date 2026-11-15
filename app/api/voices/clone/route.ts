@@ -5,7 +5,7 @@ import { ensureDevice } from "@/lib/device";
 export const maxDuration = 60;
 const MAX = 12 * 1024 * 1024;
 
-// "A voice you trust": instant voice clone from a short recording. Requires explicit consent, saved with a timestamp.
+// "Voices you trust": instant voice clones (up to 5) from a short recording. Requires explicit consent, saved with a timestamp.
 export async function POST(req: Request) {
   const device = await ensureDevice();
   const form = await req.formData().catch(() => null);
@@ -18,9 +18,8 @@ export async function POST(req: Request) {
   if (!(file instanceof Blob) || file.size < 2000 || file.size > MAX) return NextResponse.json({ error: "Please upload a recording under 12 MB." }, { status: 400 });
   if (!process.env.ELEVENLABS_API_KEY) return NextResponse.json({ error: "Voice cloning isn't configured." }, { status: 503 });
 
-  // one clone per device: replace any previous one
-  const [prev] = await q<{ clone_voice_id: string | null }>("SELECT clone_voice_id FROM preferences WHERE device_id=$1", [device]);
-  if (prev?.clone_voice_id) await fetch(`https://api.elevenlabs.io/v1/voices/${prev.clone_voice_id}`, { method: "DELETE", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }).catch(() => {});
+  const [cnt] = await q<{ n: number }>("SELECT count(*)::int n FROM cloned_voices WHERE device_id=$1", [device]);
+  if ((cnt?.n ?? 0) >= 5) return NextResponse.json({ error: "You can keep up to 5 voices. Delete one to add another." }, { status: 400 });
 
   const fd = new FormData();
   fd.append("name", `somewhere-${device.slice(0, 8)}-${name}`);
@@ -35,23 +34,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "I couldn't create that voice. Try a clearer, longer recording." }, { status: 502 });
   }
   const { voice_id } = await r.json();
-  await q(
-    `INSERT INTO preferences(device_id, voice_id, voice_kind, voice_name, voice_consent_at, clone_voice_id, clone_name, clone_consent_at) VALUES ($1,$2,'clone',$3,now(),$2,$3,now())
-     ON CONFLICT (device_id) DO UPDATE SET voice_id=$2, voice_kind='clone', voice_name=$3, voice_consent_at=now(), clone_voice_id=$2, clone_name=$3, clone_consent_at=now(), updated_at=now()`,
-    [device, voice_id, name]);
-  return NextResponse.json({ ok: true, name });
+  await q("INSERT INTO cloned_voices(device_id, voice_id, name) VALUES ($1,$2,$3)", [device, voice_id, name]);
+  return NextResponse.json({ ok: true, name, voice_id });
 }
 
-// Delete the cloned voice (at ElevenLabs too) and fall back to the default preset.
-export async function DELETE() {
+// Delete one cloned voice (at ElevenLabs too). Anything that used it falls back to the default.
+export async function DELETE(req: Request) {
   const device = await ensureDevice();
-  const [p] = await q<{ clone_voice_id: string | null }>("SELECT clone_voice_id FROM preferences WHERE device_id=$1", [device]);
-  if (p?.clone_voice_id && process.env.ELEVENLABS_API_KEY) {
-    const r = await fetch(`https://api.elevenlabs.io/v1/voices/${p.clone_voice_id}`, { method: "DELETE", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }).catch(() => null);
+  const id = new URL(req.url).searchParams.get("id") ?? "";
+  const [c] = await q<{ voice_id: string }>("SELECT voice_id FROM cloned_voices WHERE device_id=$1 AND voice_id=$2", [device, id]);
+  if (!c) return NextResponse.json({ error: "Voice not found." }, { status: 404 });
+  if (process.env.ELEVENLABS_API_KEY) {
+    const r = await fetch(`https://api.elevenlabs.io/v1/voices/${c.voice_id}`, { method: "DELETE", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }).catch(() => null);
     if (!r || !(r.ok || r.status === 404)) return NextResponse.json({ error: "Couldn't delete the voice. Please try again." }, { status: 502 });
   }
-  await q(`UPDATE preferences SET clone_voice_id=NULL, clone_name=NULL, clone_consent_at=NULL,
-    voice_id=CASE WHEN voice_kind='clone' THEN NULL ELSE voice_id END, voice_name=CASE WHEN voice_kind='clone' THEN NULL ELSE voice_name END,
-    voice_consent_at=NULL, voice_kind=CASE WHEN voice_kind='clone' THEN 'preset' ELSE voice_kind END WHERE device_id=$1`, [device]);
+  await q("DELETE FROM cloned_voices WHERE device_id=$1 AND voice_id=$2", [device, c.voice_id]);
+  await q(`UPDATE preferences SET
+    voice_kind=CASE WHEN voice_id=$2 THEN 'preset' ELSE voice_kind END, voice_name=CASE WHEN voice_id=$2 THEN NULL ELSE voice_name END,
+    voice_id=NULLIF(voice_id,$2), companion_voice_id=NULLIF(companion_voice_id,$2), diary_voice_id=NULLIF(diary_voice_id,$2) WHERE device_id=$1`, [device, c.voice_id]);
   return NextResponse.json({ ok: true });
 }

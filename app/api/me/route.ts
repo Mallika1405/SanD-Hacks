@@ -38,10 +38,10 @@ export async function DELETE() {
   const device = await currentDevice();
   let voiceDeleted = true;
   if (device) {
-    const [p] = await q<{ clone_voice_id: string | null }>("SELECT clone_voice_id FROM preferences WHERE device_id=$1", [device]);
-    if (p?.clone_voice_id && process.env.ELEVENLABS_API_KEY) {
-      const r = await fetch(`https://api.elevenlabs.io/v1/voices/${p.clone_voice_id}`, { method: "DELETE", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }).catch(() => null);
-      voiceDeleted = !!r && (r.ok || r.status === 404);
+    const clones = await q<{ voice_id: string }>("SELECT voice_id FROM cloned_voices WHERE device_id=$1", [device]);
+    if (process.env.ELEVENLABS_API_KEY) for (const c of clones) {
+      const r = await fetch(`https://api.elevenlabs.io/v1/voices/${c.voice_id}`, { method: "DELETE", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY } }).catch(() => null);
+      if (!(r && (r.ok || r.status === 404))) voiceDeleted = false;
     }
     if (voiceDeleted) await q("DELETE FROM devices WHERE id=$1", [device]); // cascades to everything
   }
