@@ -5,8 +5,8 @@ import { DESTINATIONS } from "@/lib/presets";
 import { densify, ROUTES } from "@/lib/sim";
 
 type Mode = "walk" | "ride" | "party";
-const MODES: { id: Mode; label: string; icon: string }[] = [
-  { id: "walk", label: "Walk", icon: "🚶" }, { id: "ride", label: "Ride", icon: "🚗" }, { id: "party", label: "Party", icon: "🎉" },
+const MODES: { id: Mode; label: string }[] = [
+  { id: "walk", label: "Walk" }, { id: "ride", label: "Ride" }, { id: "party", label: "Party" },
 ];
 
 function getPos(): Promise<[number, number]> {
@@ -64,7 +64,7 @@ export default function Home() {
         {MODES.map((m) => (
           <button key={m.id} role="radio" aria-checked={mode === m.id} onClick={() => setMode(m.id)}
             className={`rounded-2xl py-4 flex flex-col items-center gap-1 border-2 ${mode === m.id ? "border-accent bg-surface text-ink" : "border-transparent bg-surface/60 text-muted"}`}>
-            <span className="text-2xl" aria-hidden>{m.icon}</span><span className="text-sm font-medium">{m.label}{mode === m.id ? " ✓" : ""}</span>
+            <span className="text-sm font-medium">{m.label}{mode === m.id ? " ✓" : ""}</span>
           </button>
         ))}
       </div>

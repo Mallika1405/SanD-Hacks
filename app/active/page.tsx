@@ -340,7 +340,7 @@ function Active() {
           <CountdownBar endsAt={checkin.endsAt} />
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => resolveCheckin(true)} className="min-h-14 rounded-2xl bg-teal text-ground font-bold">✓ I'm okay</button>
-            <button onClick={() => resolveCheckin(false)} className="min-h-14 rounded-2xl bg-coral text-ground font-bold">⚠ I'm worried</button>
+            <button onClick={() => resolveCheckin(false)} className="min-h-14 rounded-2xl bg-coral text-ground font-bold">I'm worried</button>
           </div>
         </div>
       )}
@@ -352,13 +352,13 @@ function Active() {
             <p className="text-xs text-muted mb-1">Haven</p>
             <p className="text-lg leading-snug">{lastAgent ?? (connected ? "I'm here. Tell me anything, or just keep walking." : "Tap below to connect voice.")}</p>
           </section>
-          {!connected && <button onClick={() => connectVoice()} className="w-full min-h-12 rounded-2xl bg-surface text-accent">🎙 Connect voice</button>}
+          {!connected && <button onClick={() => connectVoice()} className="w-full min-h-12 rounded-2xl bg-surface text-accent">Connect voice</button>}
           <div role="group" aria-label="Voice mode" className="grid grid-cols-2 gap-2 bg-surface rounded-2xl p-1">
             {[false, true].map((q) => (
-              <button key={String(q)} aria-pressed={quiet === q} onClick={() => setQuiet(q)} className={`min-h-11 rounded-xl text-sm font-medium ${quiet === q ? "bg-accent text-ground" : "text-muted"}`}>{q ? "🔇 Quiet" : "🗣 Companion"}</button>
+              <button key={String(q)} aria-pressed={quiet === q} onClick={() => setQuiet(q)} className={`min-h-11 rounded-xl text-sm font-medium ${quiet === q ? "bg-accent text-ground" : "text-muted"}`}>{q ? "Quiet" : "Companion"}</button>
             ))}
           </div>
-          {session.mode === "walk" && explain && <p className="text-sm text-muted">🛈 {explain}</p>}
+          {session.mode === "walk" && explain && <p className="text-sm text-muted">{explain}</p>}
           {session.destination && <p className="text-sm text-muted">Heading to <span className="text-ink">{session.destination.name}</span>{best ? ` · ${km(best.distance_m)}, ~${Math.round(best.duration_s / 60)} min` : ""}</p>}
           {session.mode === "party" ? (
             <>
@@ -369,8 +369,8 @@ function Active() {
             <button onClick={onFollowed} className="w-full min-h-36 rounded-3xl bg-coral text-ground text-2xl font-bold">I'm being followed</button>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => startFake("boyfriend")} className="min-h-14 rounded-2xl bg-surface text-ink font-medium">📞 Fake call</button>
-            <button onClick={() => setView("map")} className="min-h-14 rounded-2xl bg-surface text-ink font-medium">🗺 Map</button>
+            <button onClick={() => startFake("boyfriend")} className="min-h-14 rounded-2xl bg-surface text-ink font-medium">Fake call</button>
+            <button onClick={() => setView("map")} className="min-h-14 rounded-2xl bg-surface text-ink font-medium">Map</button>
           </div>
           <HoldButton label="Send alert" onFire={() => sendAlert("manual alert")} />
           <details className="text-sm text-muted"><summary className="min-h-11 flex items-center cursor-pointer">Type instead of talking</summary>
@@ -390,15 +390,15 @@ function Active() {
             <h2 className="text-sm text-muted">Buddies</h2>
             {(followData?.calls ?? []).map((c: any) => {
               const watching = (followData.acks ?? []).some((a: any) => a.name === c.name);
-              return <p key={c.id} className="text-sm">{watching ? "👀" : "✉"} {c.name} — {watching ? "watching your location" : "texted"}</p>;
+              return <p key={c.id} className="text-sm">{c.name} — {watching ? "watching your location" : "texted"}</p>;
             })}
             {!followData && <p className="text-sm text-muted">Notifying…</p>}
           </section>
           {routes.length > 0 && <MapView center={center} markers={mapMarkers} lines={mapLines} className="h-56" />}
           <div className="grid grid-cols-1 gap-3">
-            <a href={`tel:${ESCORT_PHONE}`} className="min-h-14 rounded-2xl bg-surface flex items-center justify-center font-medium">🛡 Call campus escort</a>
-            <a href={`https://m.uber.com/ul/?action=setPickup&pickup=my_location${session.destination ? `&dropoff[latitude]=${session.destination.lat}&dropoff[longitude]=${session.destination.lng}` : ""}`} target="_blank" className="min-h-14 rounded-2xl bg-surface flex items-center justify-center font-medium">🚗 Open ride app</a>
-            <button onClick={() => startFake("friend")} className="min-h-14 rounded-2xl bg-surface font-medium">📞 Fake call</button>
+            <a href={`tel:${ESCORT_PHONE}`} className="min-h-14 rounded-2xl bg-surface flex items-center justify-center font-medium">Call campus escort</a>
+            <a href={`https://m.uber.com/ul/?action=setPickup&pickup=my_location${session.destination ? `&dropoff[latitude]=${session.destination.lat}&dropoff[longitude]=${session.destination.lng}` : ""}`} target="_blank" className="min-h-14 rounded-2xl bg-surface flex items-center justify-center font-medium">Open ride app</a>
+            <button onClick={() => startFake("friend")} className="min-h-14 rounded-2xl bg-surface font-medium">Fake call</button>
           </div>
           <HoldButton label="Send full alert" onFire={() => sendAlert("followed: escalated")} />
           <button onClick={() => setView("main")} className="w-full min-h-12 text-muted underline">Back</button>
@@ -411,14 +411,14 @@ function Active() {
           <h1 className="text-2xl font-semibold">Alert sent</h1>
           <p className={`inline-block px-3 py-2 rounded-full bg-surface ${alertData?.alert?.status === "claimed" ? "text-teal" : "text-amber"}`}>
             {alertData?.alert?.status === "claimed" ? `● ${alertData.alert.claimed_by_name} is responding` : "◌ Calling your contacts…"}</p>
-          {(alertData?.acks ?? []).filter((a: any) => a.kind.startsWith("eta:")).map((a: any) => <p key={a.name} className="text-teal">⏱ {a.name} ETA ~{a.kind.slice(4)} min</p>)}
+          {(alertData?.acks ?? []).filter((a: any) => a.kind.startsWith("eta:")).map((a: any) => <p key={a.name} className="text-teal">{a.name} ETA ~{a.kind.slice(4)} min</p>)}
           <section className="bg-surface rounded-2xl p-4 space-y-2">
-            {(alertData?.calls ?? []).map((c: any) => <p key={c.id} className="text-sm">{c.digit === "1" ? "✓" : "☎"} {c.name} — {c.status === "dry_run" ? "calling (demo)" : c.status}{c.digit === "1" ? " · pressed 1" : ""}</p>)}
+            {(alertData?.calls ?? []).map((c: any) => <p key={c.id} className="text-sm">{c.digit === "1" ? "✓" : "…"} {c.name} — {c.status === "dry_run" ? "calling (demo)" : c.status}{c.digit === "1" ? " · pressed 1" : ""}</p>)}
           </section>
           <Timeline items={alertData?.events ?? timeline} />
           <button onClick={() => router.push("/911")} className="w-full min-h-14 rounded-2xl bg-coral text-ground font-bold">Connect to 911 (demo handoff)</button>
           {places[0] && <PlaceCard p={places[0]} label="Nearest staffed place" />}
-          <button onClick={() => startFake("dad")} className="w-full min-h-14 rounded-2xl bg-surface">📞 Fake call</button>
+          <button onClick={() => startFake("dad")} className="w-full min-h-14 rounded-2xl bg-surface">Fake call</button>
           <button onClick={cancelAlert} className="w-full min-h-14 rounded-2xl border border-muted text-ink">I'm safe — cancel alert</button>
         </>
       )}
@@ -443,7 +443,7 @@ function Active() {
       {view === "map" && (
         <>
           <MapView center={center} markers={mapMarkers} lines={mapLines} heat={heat} className="h-[60vh]" />
-          <div className="text-xs text-muted space-y-1"><p>━ solid: lit route · ┄ dashed: dim or unknown lighting</p><p>🟠 staffed places (may have changed) · 🔴 haze: recent anonymized reports</p>{explain && <p className="text-ink">{explain}</p>}</div>
+          <div className="text-xs text-muted space-y-1"><p>━ solid: lit route · ┄ dashed: dim or unknown lighting</p><p>Amber pins: staffed places (hours may have changed) · Red haze: recent anonymized reports</p>{explain && <p className="text-ink">{explain}</p>}</div>
           <button onClick={() => setView("main")} className="w-full min-h-12 rounded-2xl bg-surface">Back</button>
         </>
       )}
