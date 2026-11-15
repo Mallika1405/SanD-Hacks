@@ -60,14 +60,14 @@ export default function Voice() {
 
   const clone = d?.clone?.existing;
   return (
-    <main className="p-5 pb-12 space-y-6">
-      <a href="/" className="text-sm text-muted underline min-h-12 inline-flex items-center">← Home</a>
-      <h1 className="text-2xl font-semibold">Choose a voice</h1>
+    <main className="max-w-[760px] space-y-6 fade-in">
+      <span className="tag">Voice</span>
+      <h1 className="text-[2.4rem] leading-tight">Choose a voice</h1>
       <p className="text-muted">Press play to hear each one. Pick the one that feels calmest.</p>
       {!d && <p className="text-muted">Loading…</p>}
       <ul className="space-y-3">
         {d?.presets.map((p: any) => (
-          <li key={p.id} className="bg-surface rounded-2xl p-4 flex items-center justify-between gap-3">
+          <li key={p.id} className="card p-4 flex items-center justify-between gap-3">
             <div><p className="text-lg font-medium">{p.name}{d.selected.id === p.id ? " ✓" : ""}</p><p className="text-sm text-muted">{p.blurb}</p></div>
             <div className="flex gap-2">
               <button onClick={() => preview(p.id)} aria-label={`Preview ${p.name}`} className="px-4 min-h-12 rounded-xl bg-ground text-ink">{playing === p.id ? "Playing…" : "Play"}</button>
@@ -78,7 +78,7 @@ export default function Voice() {
       </ul>
 
       {d?.clone?.available && (
-        <section className="bg-surface rounded-2xl p-4 space-y-3" aria-label="A voice you trust">
+        <section className="card p-4 space-y-3" aria-label="A voice you trust">
           <h2 className="text-xl font-semibold">A voice you trust</h2>
           <p className="text-sm text-muted">Hear the guidance in a voice that feels safe, like yours or someone close to you. It only ever says Somewhere's own reviewed words, never anything typed in.</p>
           {clone ? (

@@ -85,7 +85,7 @@ export async function discover(city: string, opts: { maxPages?: number; log?: (s
 /* ---------------------------------------------------------------- matching (cache only) */
 
 export type Answers = {
-  city: string; goals: string[]; budget: "free" | "low" | "flexible"; insurance: string; language: string; gender: string; extras: string[]; format: "online" | "in_person" | "either";
+  city: string; goals: string[]; budget: "free" | "low" | "flexible"; insurance: string; modality: ("therapy" | "groups" | "psychiatry" | "low_cost")[]; language: string; gender: string; extras: string[]; format: "online" | "in_person" | "either";
 };
 
 const FALLBACK: Record<string, { name: string; why: string; terms: string[] }> = {
@@ -125,6 +125,9 @@ export async function rank(answers: Answers, specialties: Spec[]) {
     (answers.gender && answers.gender !== "No preference" && new RegExp(`\\b${answers.gender.toLowerCase()}\\b`).test(t) ? 1 : 0) +
     answers.extras.filter((e) => t.includes(e.toLowerCase().split(" ")[0])).length;
 
+  const plans = HAS_PLAN(answers) ? answers.insurance.toLowerCase().split(/[\/,&]| or /).map((x) => x.replace(/[^a-z0-9 ]/g, " ").trim()).filter((x) => x.length > 2) : [];
+  const mentions = (p: any) => { const t = hay(p.insurance_text, p.notes, p.quote, p.cost_text); return plans.some((pl) => t.includes(pl) || t.includes(pl.split(" ")[0])); };
+  const m = answers.modality?.length ? answers.modality : ["therapy", "groups"];
   const providers = prov.map((p: any) => {
     const t = hay(p.name, p.specialties, p.modalities, p.notes, p.quote);
     const loc = hay(p.location, p.source_url, p.name);
@@ -132,7 +135,9 @@ export async function rank(answers: Answers, specialties: Spec[]) {
     const online = p.telehealth === true;
     let sc = specHits * 3 + prefHit(t) + (loc.includes(city) ? 2 : 0) + (answers.format !== "in_person" && online ? 1.5 : 0) + (budgetHit(hay(p.cost_text, p.kind)) || p.kind === "low_cost" ? (answers.budget === "flexible" ? 0 : 2) : 0);
     if (answers.format === "online" && !online && p.telehealth === false) sc -= 2;
-    return { p, sc };
+    const im = mentions(p); if (im) sc += 3;
+    if (!m.includes("psychiatry") && /psychiatr|medication management/i.test(p.name + " " + (p.specialties ?? []).join(" "))) sc -= 4;
+    return { p: { ...p, insurance_match: im }, sc };
   }).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 8).map((x) => x.p);
 
   const groups = grp.map((g: any) => {
@@ -146,7 +151,7 @@ export async function rank(answers: Answers, specialties: Spec[]) {
 
   const [stat] = await q<{ n: number; last: string }>(`SELECT (SELECT count(*) FROM providers)::int + (SELECT count(*) FROM groups)::int AS n,
     GREATEST((SELECT max(checked_at) FROM providers), (SELECT max(checked_at) FROM groups)) AS last`);
-  return { providers, groups, directory: { listings: stat?.n ?? 0, last_checked: stat?.last ?? null } };
+  return { providers: m.includes("therapy") || m.includes("psychiatry") || m.includes("low_cost") ? providers : [], groups: m.includes("groups") ? groups : [], directory: { listings: stat?.n ?? 0, last_checked: stat?.last ?? null } };
 }
 
 export async function search(answers: Answers, flows: string[]) {
@@ -154,19 +159,26 @@ export async function search(answers: Answers, flows: string[]) {
   return { specialties, ...(await rank(answers, specialties)) };
 }
 
-/** Queries built from HER answers, not a fixed list. */
+const HAS_PLAN = (a: Answers) => !!a.insurance && !/^(no insurance|not sure|self-pay)$/i.test(a.insurance.trim());
+/** Queries built from HER answers (location, insurance, care type, budget), not a fixed list. */
 export function liveQueries(a: Answers, specs: Spec[]): string[] {
   const city = a.city || "San Diego, CA";
+  const place = a.format === "online" ? "online telehealth California" : city;
+  const plan = HAS_PLAN(a) ? ` ${a.insurance} insurance accepted` : "";
   const top = specs.slice(0, 2).map((s) => s.name.replace(/\(.*?\)/g, "").trim());
-  const qs: string[] = [];
-  for (const t of top) qs.push(`${t} therapist ${a.format === "online" ? "online telehealth California" : city}`);
   const goalWords = a.goals.length ? a.goals.slice(0, 2).map((g) => g.toLowerCase()) : ["anxiety"];
-  for (const g of goalWords) qs.push(`${g} support group ${a.format === "online" ? "online" : city}`);
-  if (a.budget !== "flexible" || /medi-?cal|medicaid|no insurance/i.test(a.insurance)) qs.push(`${a.budget === "free" ? "free" : "sliding scale low cost"} therapy ${a.format === "online" ? "online" : city} anxiety`);
-  if (/medi-?cal|medicaid/i.test(a.insurance)) qs.push(`Medi-Cal accepted therapist ${city} anxiety`);
+  const qs: string[] = [];
+  const m = a.modality?.length ? a.modality : ["therapy", "groups"];
+  if (m.includes("therapy")) { for (const t of top) qs.push(`${t} therapist ${place}${plan}`); if (HAS_PLAN(a)) qs.push(`${a.insurance} in-network therapist ${city} anxiety panic`); }
+  if (m.includes("groups")) for (const g of goalWords) qs.push(`${g} support group ${a.format === "online" ? "online" : city}`);
+  if (m.includes("psychiatry")) qs.push(`psychiatrist anxiety medication management ${place}${plan}`);
+  if (m.includes("low_cost") || a.budget !== "flexible" || /medi-?cal|medicaid|no insurance/i.test(a.insurance)) {
+    qs.push(`${a.budget === "free" ? "free" : "sliding scale low cost"} therapy ${place} anxiety`);
+    qs.push(`community mental health clinic ${city} low cost anxiety`);
+  }
   if (a.extras.includes("LGBTQ+ affirming")) qs.push(`LGBTQ affirming therapist ${city} anxiety`);
   if (a.language && a.language !== "English") qs.push(`${a.language} speaking therapist ${city} anxiety`);
-  return [...new Set(qs)].slice(0, 6);
+  return [...new Set(qs)].slice(0, 7);
 }
 
 /**

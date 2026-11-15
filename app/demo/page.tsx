@@ -51,7 +51,7 @@ export default function Demo() {
         <a href="/" className="block min-h-12 leading-[48px] underline text-accent">See the check-in card on Home</a>
         <a href="/care" className="block min-h-12 leading-[48px] underline text-accent">Find support (reads public pages live)</a>
         <a href="/voice" className="block min-h-12 leading-[48px] underline text-accent">Voices and "a voice you trust"</a>
-        <a href="/me" className="block min-h-12 leading-[48px] underline text-accent">What I remember and Delete my data</a>
+        <a href="/between" className="block min-h-12 leading-[48px] underline text-accent">Between Moments (what I remember, Delete my data)</a>
         {msg && <p role="status" className="text-teal text-sm">{msg}</p>}
       </section>
       <p className="text-xs text-muted">Somewhere is a demo and not a medical service or crisis line. If you're in crisis, call or text 988. For a medical emergency, call 911.</p>

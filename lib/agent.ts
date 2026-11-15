@@ -1,7 +1,7 @@
 import { q } from "./db";
 import { gemini } from "./gemini";
 import { assessSafety, CRISIS_SEGS, MEDICAL_SEGS, SAFETY_QUESTION } from "./safety";
-import { BY_FLOW, EXERCISES, Flow as ExerciseFlow, getExercise } from "./exercises";
+import { BY_FLOW, EXERCISES, Flow as ExerciseFlow, getExercise, getMeta } from "./exercises";
 import { out, OutSeg, Seg } from "./speech";
 import { listSourced, slug } from "./techniques";
 
@@ -15,7 +15,7 @@ type Flow = ExerciseFlow | "checkin" | "talk";
 export type State = "start" | "support" | "adapt" | "finish" | "followup" | "crisis";
 type Pending = "safety" | "finish_choice" | "checkin" | "checkin_reply";
 type Ctx = {
-  exId?: string; checkinId?: string; sit?: string; rkey?: string; rcount?: number; blocks?: number;
+  exId?: string; checkinId?: string; where?: string; sit?: string; rkey?: string; rcount?: number; blocks?: number;
   tried: string[]; helped: string[]; worse: string[]; slow?: boolean; pending?: Pending;
   resumeIdx?: number; recent: { r: "u" | "a"; t: string }[]; turns: number;
 };
@@ -24,7 +24,7 @@ export type TurnInput = {
 };
 export type TurnOut = {
   say: OutSeg[]; lead: number; exBase: number; state: State; flow: Flow; exerciseId?: string; exerciseTitle?: string; research?: { key: string; flow: string; sit: string };
-  catalog: { id: string; title: string; blurb: string; source?: string }[]; transitions: OutSeg[]; progress: { block: number; max: number };
+  why: { text: string; source?: { name: string; url: string } } | null; anchors: string[]; catalog: { id: string; title: string; blurb: string; source?: string }[]; transitions: OutSeg[]; progress: { block: number; max: number };
   ui: { crisis?: "self_harm" | "medical"; finish?: boolean; followup?: boolean; trusted?: boolean; checkinConsent?: boolean; suggestCare?: boolean; done?: boolean; rate?: boolean; source?: { name: string; url: string; title: string } };
 };
 
@@ -85,9 +85,9 @@ async function talkReply(text: string, recent: Ctx["recent"]): Promise<string> {
 }
 
 /** Researched steps come from web pages: have Gemini say them like a person. Same steps, same count, same meaning. Falls back to the originals. */
-async function humanize(segs: Seg[], sit: string | undefined): Promise<Seg[]> {
+async function humanize(segs: Seg[], sit: string | undefined, extra = ""): Promise<Seg[]> {
   const g = await gemini<{ lines: string[] }>(
-    `Rewrite each line so a calm, warm person would say it out loud to someone who is anxious${sit ? ` (${sit})` : ""}. Keep the exact same instruction and the same number of lines. Short, spoken, contractions. No questions. No promises. No "relax" or "calm down". Lines:\n${JSON.stringify(segs.map((x) => x.text))}\nReply JSON {"lines":[...]}`,
+    `Rewrite each line so a calm, warm person would say it out loud to someone who is anxious${sit ? ` (${sit})` : ""}${extra ? `. About them: ${extra}` : ""}. Keep the exact same instruction and the same number of lines. Short, spoken, contractions. No questions. No promises. No "relax" or "calm down". Lines:\n${JSON.stringify(segs.map((x) => x.text))}\nReply JSON {"lines":[...]}`,
     true, { timeoutMs: 6000 });
   const lines = g?.lines;
   if (!Array.isArray(lines) || lines.length !== segs.length) return segs;
@@ -121,6 +121,7 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
     if (ctx.rkey && !force) return;
     if ((ctx.rcount ?? 0) >= 2) return;
     const f = flow === "overwhelm" ? "overwhelm" : "panic";
+    if (ctx.where && !sit.includes(ctx.where)) sit = `${sit} ${ctx.where}`;
     const key = `${f}:${slug(sit)}`;
     if (key === ctx.rkey) return;
     ctx.sit = sit; ctx.rkey = key; ctx.rcount = (ctx.rcount ?? 0) + 1; research = { key, flow: f, sit };
@@ -291,7 +292,7 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
   // Researched blocks are machine-extracted: have Gemini say them like a person (never the reviewed ones, which are already written to be spoken).
   if (ctx.exId?.startsWith("src:") && !ui.crisis && say.length > Math.max(lead, 0)) {
     const l0 = Math.max(lead, 0);
-    say = [...say.slice(0, l0), ...(await humanize(say.slice(l0), ctx.sit))];
+    say = [...say.slice(0, l0), ...(await humanize(say.slice(l0), ctx.sit, [ctx.where ? `they are ${ctx.where}` : "", pr?.prefers?.hard_times ? `${pr.prefers.hard_times} are harder for them` : ""].filter(Boolean).join("; ")))];
   }
   const ex = ctx.exId ? getEx(ctx.exId) : null;
   if (ex?.source_url) ui.source = { name: ex.source_name, url: ex.source_url, title: ex.title };
@@ -302,12 +303,13 @@ export async function turn(sessionId: string, deviceId: string, input: TurnInput
 
   if (lead < 0) lead = say.length;
   const sf = seqFlow();
+  const meta: any = ctx.exId ? (ex?.source_url ? { why: ex.why, anchors: ex.anchors, source: { name: ex.source_name, url: ex.source_url } } : getMeta(ctx.exId)) : null;
   const catalog = [
     ...EXERCISES.filter((e) => e.flows.includes(sf) || e.id === "exhale-breath").map((e) => ({ id: e.id, title: e.title, blurb: e.blurb })),
     ...sourced.map((e) => ({ id: e.id, title: e.title, blurb: `From ${e.source_name}`, source: e.source_name })),
   ];
   return {
     say: out(say, ctx.slow), lead, exBase, state, flow: flow as any, exerciseId: ctx.exId, exerciseTitle: ex?.title, ui, research,
-    catalog, transitions: out(TRANSITIONS.map((t) => S(t, 0))), progress: { block: ctx.blocks ?? 0, max: MAX_BLOCKS },
+    why: meta?.why ? { text: meta.why, source: meta.source } : null, anchors: meta?.anchors ?? [], catalog, transitions: out(TRANSITIONS.map((t) => S(t, 0))), progress: { block: ctx.blocks ?? 0, max: MAX_BLOCKS },
   };
 }

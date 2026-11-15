@@ -2,8 +2,14 @@
 import { useRef, useState } from "react";
 
 const GOALS = ["Panic attacks", "Unwanted thoughts", "Feeling overwhelmed", "Stress", "Feeling low", "Someone to talk to regularly"];
-const BUDGET: [string, "free" | "low" | "flexible"][] = [["Free options", "free"], ["Low cost or sliding scale", "low"], ["I'm flexible", "flexible"]];
-const INSURANCE = ["No insurance", "Medi-Cal / Medicaid", "Through work", "Student plan", "Not sure"];
+const MODALITY: { id: "therapy" | "groups" | "psychiatry" | "low_cost"; title: string; sub: string }[] = [
+  { id: "therapy", title: "Individual therapy", sub: "One-on-one with a therapist" },
+  { id: "groups", title: "Support groups", sub: "Peer or facilitated groups" },
+  { id: "psychiatry", title: "Psychiatry / meds", sub: "A prescriber, if you want one" },
+  { id: "low_cost", title: "Sliding scale & community", sub: "Free or lower-cost clinics" },
+];
+const PLANS = ["Aetna", "Blue Cross / Anthem", "Cigna", "Kaiser Permanente", "UnitedHealthcare", "Medi-Cal / Medicaid", "Medicare", "Self-pay", "No insurance"];
+const BUDGET: [string, "free" | "low" | "flexible"][] = [["Free only", "free"], ["Lower cost / sliding scale", "low"], ["Flexible", "flexible"]];
 const LANGS = ["English", "Spanish", "Other"];
 const GENDER = ["No preference", "Woman", "Man"];
 const EXTRAS = ["LGBTQ+ affirming", "Culturally specific", "Faith-based", "Young adult / student"];
@@ -11,52 +17,56 @@ const FORMAT: [string, "online" | "in_person" | "either"][] = [["Online", "onlin
 
 const ago = (iso: string | null) => { if (!iso) return "never"; const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); return m < 2 ? "just now" : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`; };
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return "source"; } };
-const b64 = (t: string) => { const b = new TextEncoder().encode(t); let s = ""; b.forEach((c) => (s += String.fromCharCode(c))); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
-
-function Chips({ options, value, onChange, multi }: { options: string[]; value: string[]; onChange: (v: string[]) => void; multi?: boolean }) {
-  return (
-    <div className="flex flex-wrap gap-2" role="group">
-      {options.map((o) => {
-        const on = value.includes(o);
-        return <button key={o} aria-pressed={on} onClick={() => onChange(multi ? (on ? value.filter((x) => x !== o) : [...value, o]) : [o])}
-          className={`px-4 rounded-full text-base min-h-12 ${on ? "bg-accent text-ground font-semibold" : "bg-surface text-ink"}`}>{on ? "✓ " : ""}{o}</button>;
-      })}
-    </div>
-  );
-}
 
 function Field({ label, text }: { label: string; text: string | null }) {
-  return (
-    <p className="text-sm"><span className="text-muted">{label}: </span>{text ? <>{text} <span className="text-amber">(unverified, confirm with the provider)</span></> : <span className="text-muted">Not stated on their page. Ask them.</span>}</p>
-  );
+  return <p className="text-[14px]"><span className="text-ink2">{label}: </span>{text ? <>{text} <span className="tag tag-terra ml-1">Unverified</span></> : <span className="text-ink2">Not stated on their page. Ask them.</span>}</p>;
 }
 
 export default function Care() {
-  const [step, setStep] = useState(0);
   const [goals, setGoals] = useState<string[]>([]);
-  const [budget, setBudget] = useState<"free" | "low" | "flexible">("flexible");
+  const [modality, setModality] = useState<("therapy" | "groups" | "psychiatry" | "low_cost")[]>(["therapy", "groups"]);
   const [insurance, setInsurance] = useState("");
+  const [budget, setBudget] = useState<"free" | "low" | "flexible">("flexible");
   const [language, setLanguage] = useState("English");
   const [gender, setGender] = useState("No preference");
   const [extras, setExtras] = useState<string[]>([]);
-  const [city, setCity] = useState("San Diego, CA");
+  const [city, setCity] = useState("");
   const [format, setFormat] = useState<"online" | "in_person" | "either">("either");
   const [res, setRes] = useState<any>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const [msg, setMsg] = useState("");
-  const [reading, setReading] = useState(false);
-  const audio = useRef<HTMLAudioElement | null>(null);
-
   const [live, setLive] = useState("");
   const [working, setWorking] = useState(false);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [script, setScript] = useState("");
+  const results = useRef<HTMLDivElement | null>(null);
+
+  const toggle = <T,>(arr: T[], v: T, set: (a: T[]) => void) => set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+
+  function locate() {
+    if (!navigator.geolocation) return setErr("Your browser can't share location. Type your city instead.");
+    setLocating(true); setErr("");
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      const j = await fetch("/api/care/locate", { method: "POST", body: JSON.stringify({ lat: p.coords.latitude, lng: p.coords.longitude }) }).then((r) => r.json()).catch(() => ({}));
+      if (j.city) setCity(j.city); else setErr("I couldn't work out your city. Please type it.");
+      setLocating(false);
+    }, () => { setErr("Location was blocked. Type your city instead."); setLocating(false); }, { timeout: 8000 });
+  }
+
+  async function makeScript(name?: string) {
+    const kind = modality.includes("groups") && !modality.includes("therapy") ? "groups" : modality.includes("psychiatry") && !modality.includes("therapy") ? "psychiatry" : "therapy";
+    const r = await fetch("/api/care/script", { method: "POST", body: JSON.stringify({ insurance, kind, focus: (goals[0] ?? "anxiety").toLowerCase(), budget, name }) }).then((x) => x.json()).catch(() => null);
+    if (r?.text) setScript(r.text);
+  }
 
   async function run() {
-    setBusy(true); setErr(""); setMsg("");
-    setRes({ specialties: [], providers: [], groups: [], say: [], directory: { listings: 0, last_checked: null } });
-    setStep(6); setWorking(true); setLive("Starting…");
+    if (!city.trim()) return setErr("Add your city, or tap “Use my location”, so I can look nearby.");
+    setErr(""); setMsg(""); setScript("");
+    setRes({ specialties: [], providers: [], groups: [], directory: { listings: 0, last_checked: null } });
+    setWorking(true); setLive("Starting…");
+    setTimeout(() => results.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     try {
-      const r = await fetch("/api/care/search", { method: "POST", body: JSON.stringify({ city, goals, budget, insurance, language, gender, extras, format }) });
+      const r = await fetch("/api/care/search", { method: "POST", body: JSON.stringify({ city, goals, budget, insurance, language, gender, extras, format, modality }) });
       if (!r.ok || !r.body) throw new Error();
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
       for (;;) {
@@ -68,137 +78,138 @@ export default function Care() {
           if (!line) continue;
           const e = JSON.parse(line);
           if (e.type === "status") setLive(e.text);
-          else if (e.type === "specialties") setRes((x: any) => ({ ...x, specialties: e.specialties, say: e.say }));
+          else if (e.type === "specialties") setRes((x: any) => ({ ...x, specialties: e.specialties }));
           else if (e.type === "results") setRes((x: any) => ({ ...x, providers: e.providers, groups: e.groups, directory: e.directory }));
           else if (e.type === "error") setErr("Something went wrong while searching. What's shown may be incomplete.");
         }
       }
     } catch { setErr("I couldn't finish the search. What's shown may be incomplete."); }
-    setWorking(false); setBusy(false);
+    setWorking(false);
+    makeScript();
   }
 
-  async function listen() {
-    if (reading) { audio.current?.pause(); setReading(false); return; }
-    setReading(true);
-    const v = (await fetch("/api/voices").then((r) => r.json()).catch(() => null))?.selected?.id ?? "EXAVITQu4vr4xnSDxMaL";
-    const a = (audio.current = new Audio());
-    for (const s of res.say) {
-      if (!audio.current) break;
-      await new Promise<void>((done) => { a.onended = () => done(); a.onerror = () => done(); a.src = `/api/sos/tts?t=${b64(s.text)}&s=${s.sig}&v=${v}`; a.play().catch(() => done()); });
-      await new Promise((r) => setTimeout(r, s.pause_ms));
-    }
-    setReading(false);
-  }
-
-  const checklist = [
-    `Do you take ${insurance && insurance !== "Not sure" && insurance !== "No insurance" ? `my insurance (${insurance})` : "insurance? If not, what do you offer?"}`,
-    `What does a session cost${budget !== "flexible" ? ", and do you have a sliding scale or lower-cost option?" : "?"}`,
-    "Are you accepting new clients, and how soon could I start?",
-    `What's your approach for ${res?.specialties?.[0]?.name?.toLowerCase() ?? "what I'm going through"}?`,
-    format !== "in_person" ? "Do you offer online sessions?" : "Where are you located, and is there parking or transit?",
-    "What's your cancellation policy?",
-  ];
-  async function copyList() {
-    try { await navigator.clipboard.writeText("Questions to ask:\n" + checklist.map((c) => `- ${c}`).join("\n")); setMsg("Copied."); } catch { setMsg("Couldn't copy. You can screenshot this list."); }
-  }
   async function save() {
     await fetch("/api/care/save", { method: "POST", body: JSON.stringify({ providerIds: res.providers.map((p: any) => p.id), groupIds: res.groups.map((g: any) => g.id) }) });
-    setMsg("Saved on this device. You can delete it any time under You.");
+    setMsg("Saved on this device. You can remove it any time under Between Moments.");
   }
+  async function copy(t: string) { try { await navigator.clipboard.writeText(t); setMsg("Copied."); } catch { setMsg("Couldn't copy. You can select the text instead."); } }
+
+  const sources = res ? [...new Map([...res.providers, ...res.groups].map((x: any) => [host(x.source_url), x])).entries()] : [];
 
   return (
-    <main className="p-5 pb-12 space-y-5">
-      <a href="/" className="text-sm text-muted underline min-h-12 inline-flex items-center">← Home</a>
+    <div className="space-y-8 fade-in">
+      <section className="grid lg:grid-cols-[1.4fr_1fr] gap-6 items-end">
+        <div>
+          <span className="tag">Read live from public pages</span>
+          <h1 className="mt-3 text-[2.6rem] lg:text-[3.2rem] leading-[1.08]">Finding care without the maze.</h1>
+          <p className="mt-3 text-ink2 prose-narrow">Tell me where you are, what you'd like help with, and your insurance or budget. I'll read public pages for therapists and groups near you and show exactly what each page says, with the source.</p>
+        </div>
+        <div className="card-flat p-5 text-[14px] text-ink2"><p className="font-semibold text-ink">How to read this</p><p className="mt-1">Everything here is read from public pages and <b>not verified by us</b>. Insurance, cost and availability are what a page says, so always confirm with the provider.</p></div>
+      </section>
 
-      {step === 0 && (
-        <section className="space-y-4">
-          <h1 className="text-3xl font-semibold leading-tight">Would you like to look for support beyond this?</h1>
-          <p className="text-muted text-lg leading-snug">You don't need to know what type of therapist to look for. I'll ask a few simple questions and show options from public sources.</p>
-          <button onClick={() => setStep(1)} className="w-full min-h-16 rounded-2xl bg-accent text-ground text-lg font-bold">Yes, help me look</button>
-          <a href="/" className="block text-center min-h-12 leading-[48px] text-muted">Not right now</a>
-        </section>
-      )}
-      {step === 1 && <section className="space-y-4"><h2 className="text-2xl font-semibold">What would you like help with?</h2><p className="text-muted">Pick any that fit. You can skip this.</p><Chips multi options={GOALS} value={goals} onChange={setGoals} /><Next onClick={() => setStep(2)} /></section>}
-      {step === 2 && (
-        <section className="space-y-4"><h2 className="text-2xl font-semibold">What fits your budget?</h2>
-          <Chips options={BUDGET.map((b) => b[0])} value={[BUDGET.find((b) => b[1] === budget)![0]]} onChange={(v) => setBudget(BUDGET.find((b) => b[0] === v[0])![1])} />
-          <h3 className="text-lg font-medium pt-2">Insurance</h3><Chips options={INSURANCE} value={insurance ? [insurance] : []} onChange={(v) => setInsurance(v[0])} />
-          <Next onClick={() => setStep(3)} /></section>
-      )}
-      {step === 3 && (
-        <section className="space-y-4"><h2 className="text-2xl font-semibold">Anything that would make it feel safer?</h2><p className="text-muted">All optional. Share only what you want to.</p>
-          <h3 className="text-lg font-medium">Language</h3><Chips options={LANGS} value={[language]} onChange={(v) => setLanguage(v[0])} />
-          <h3 className="text-lg font-medium pt-1">Therapist</h3><Chips options={GENDER} value={[gender]} onChange={(v) => setGender(v[0])} />
-          <h3 className="text-lg font-medium pt-1">Also important to me</h3><Chips multi options={EXTRAS} value={extras} onChange={setExtras} />
-          <Next onClick={() => setStep(4)} /></section>
-      )}
-      {step === 4 && (
-        <section className="space-y-4"><h2 className="text-2xl font-semibold">Where, and how?</h2>
-          <label className="block"><span className="text-muted text-sm">City</span><input value={city} onChange={(e) => setCity(e.target.value)} className="mt-1 w-full bg-surface rounded-xl px-4 min-h-14 text-lg" /></label>
-          <Chips options={FORMAT.map((f) => f[0])} value={[FORMAT.find((f) => f[1] === format)![0]]} onChange={(v) => setFormat(FORMAT.find((f) => f[0] === v[0])![1])} />
-          <button disabled={busy} onClick={run} className="w-full min-h-16 rounded-2xl bg-accent text-ground text-lg font-bold disabled:opacity-50">{busy ? "Looking…" : "Show me options"}</button>
-          {err && <p role="alert" className="text-coral">{err}</p>}</section>
-      )}
+      {/* ---------- guided filter ---------- */}
+      <section className="card p-6 lg:p-8 space-y-7" aria-label="Guided filter">
+        <h2 className="text-[1.6rem]">Start where you are</h2>
 
-      {step === 6 && res && (
-        <section className="space-y-6">
-          <div className="space-y-2">
-            {(working || live) && <p role="status" aria-live="polite" className="bg-surface rounded-xl px-4 py-3 text-sm text-teal">{working ? "● " : "✓ "}{live}</p>}
-            {err && <p role="alert" className="text-coral text-sm">{err}</p>}
-            <h1 className="text-2xl font-semibold">Kinds of care you might explore</h1>
-            <p className="text-sm text-muted">This isn't a diagnosis. It's a starting point for a conversation with a professional.</p>
-            {res.say?.length > 0 && <button onClick={listen} className="px-4 min-h-12 rounded-full bg-surface text-teal">{reading ? "Stop reading" : "Read this to me"}</button>}
-            <ul className="space-y-2">{res.specialties.map((s: any) => <li key={s.name} className="bg-surface rounded-2xl p-4"><p className="font-medium">{s.name}</p><p className="text-sm text-muted">{s.why}</p></li>)}</ul>
+        <div className="space-y-3"><h3 className="text-[1.15rem]"><span className="text-sage font-semibold mr-2">1</span>What feels most pressing right now? <span className="text-[13px] text-ink2 font-normal">(pick any)</span></h3>
+          <div className="flex flex-wrap gap-2">{GOALS.map((g) => <button key={g} className="chip" aria-pressed={goals.includes(g)} onClick={() => toggle(goals, g, setGoals)}>{g}</button>)}</div></div>
+
+        <div className="space-y-3"><h3 className="text-[1.15rem]"><span className="text-sage font-semibold mr-2">2</span>What kind of care are you open to?</h3>
+          <div className="grid sm:grid-cols-2 gap-2">{MODALITY.map((m) => { const on = modality.includes(m.id); return (
+            <button key={m.id} role="checkbox" aria-checked={on} onClick={() => toggle(modality, m.id, setModality)} className="check-row"><span className="box">{on && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>}</span><span><span className="block font-semibold text-[15px]">{m.title}</span><span className="block text-[13.5px] text-ink2">{m.sub}</span></span></button>); })}</div></div>
+
+        <div className="space-y-3"><h3 className="text-[1.15rem]"><span className="text-sage font-semibold mr-2">3</span>Insurance or budget</h3>
+          <div className="flex flex-wrap gap-2">{PLANS.map((p) => <button key={p} className="chip" aria-pressed={insurance === p} onClick={() => setInsurance(insurance === p ? "" : p)}>{p}</button>)}</div>
+          <div className="grid sm:grid-cols-2 gap-3 items-end">
+            <label className="block"><span className="text-[13.5px] text-ink2">Another plan, or a plan name</span><input value={PLANS.includes(insurance) ? "" : insurance} onChange={(e) => setInsurance(e.target.value)} placeholder="e.g. Oscar, Tricare, my school's plan" className="mt-1" /></label>
+            <div className="seg" role="group" aria-label="Budget">{BUDGET.map(([l, v]) => <button key={v} aria-pressed={budget === v} onClick={() => setBudget(v)}>{l}</button>)}</div></div>
+          <p className="text-[13px] text-ink2">I search for pages that mention your plan and show what they say. That is not confirmation they accept it.</p></div>
+
+        <div className="space-y-3"><h3 className="text-[1.15rem]"><span className="text-sage font-semibold mr-2">4</span>Where, and how?</h3>
+          <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
+            <label className="block"><span className="text-[13.5px] text-ink2">City or ZIP</span><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. San Diego, CA" className="mt-1" autoComplete="address-level2" /></label>
+            <button onClick={locate} disabled={locating} className="b b-ghost">{locating ? "Finding you…" : "Use my location"}</button></div>
+          <p className="text-[13px] text-ink2">Your location is only used to find your city. It isn't stored.</p>
+          <div className="seg max-w-sm" role="group" aria-label="Format">{FORMAT.map(([l, v]) => <button key={v} aria-pressed={format === v} onClick={() => setFormat(v)}>{l}</button>)}</div></div>
+
+        <details className="card-flat p-4"><summary className="cursor-pointer font-semibold min-h-10 flex items-center">Anything that would make it feel safer? <span className="text-ink2 font-normal ml-2 text-[13px]">(optional)</span></summary>
+          <div className="mt-3 space-y-4"><div><p className="eyebrow mb-2">Language</p><div className="flex flex-wrap gap-2">{LANGS.map((l) => <button key={l} className="chip" aria-pressed={language === l} onClick={() => setLanguage(l)}>{l}</button>)}</div></div>
+            <div><p className="eyebrow mb-2">Therapist</p><div className="flex flex-wrap gap-2">{GENDER.map((l) => <button key={l} className="chip" aria-pressed={gender === l} onClick={() => setGender(l)}>{l}</button>)}</div></div>
+            <div><p className="eyebrow mb-2">Also important to me</p><div className="flex flex-wrap gap-2">{EXTRAS.map((l) => <button key={l} className="chip" aria-pressed={extras.includes(l)} onClick={() => toggle(extras, l, setExtras)}>{l}</button>)}</div></div></div></details>
+
+        <div className="flex flex-wrap items-center gap-3"><button onClick={run} disabled={working} className="b b-primary !min-h-[52px] px-8">{working ? "Reading public pages…" : "Find options"}</button>
+          {err && <p role="alert" className="text-terra text-[14.5px]">{err}</p>}</div>
+      </section>
+
+      {/* ---------- results ---------- */}
+      <div ref={results} className="scroll-mt-24" />
+      {res && (
+        <section className="space-y-6" aria-label="Results">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-[1.9rem]">{working ? "Looking through public pages…" : `${res.providers.length + res.groups.length} matches`}</h2>
+            {live && <p role="status" aria-live="polite" className="tag tag-sage !text-[12.5px] !py-1.5">{working ? "● " : "✓ "}{live}</p>}
           </div>
 
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold">Therapists and clinics</h2>
-            {!res.providers.length && <p className="text-muted bg-surface rounded-2xl p-4">{working ? "Looking through public pages for you…" : "I couldn't find good matches from public pages yet. Try changing the city or format."}</p>}
+          {res.specialties?.length > 0 && (
+            <div className="card-flat p-5"><p className="eyebrow">Kinds of care you might explore</p>
+              <ul className="mt-2 grid sm:grid-cols-2 gap-3">{res.specialties.map((s: any) => <li key={s.name}><p className="font-semibold">{s.name}</p><p className="text-[14px] text-ink2">{s.why}</p></li>)}</ul>
+              <p className="mt-2 text-[12.5px] text-ink2">This isn't a diagnosis. It's a starting point for a conversation with a professional.</p></div>
+          )}
+
+          {res.providers.length === 0 && <p className="card-flat p-5 text-ink2">{working ? "Reading pages for therapists and clinics…" : "I couldn't find good matches on public pages yet. Try another city or care type."}</p>}
+          <div className="space-y-4">
             {res.providers.map((p: any) => (
-              <article key={p.id} className="bg-surface rounded-2xl p-4 space-y-1.5">
-                <h3 className="text-lg font-medium">{p.name}</h3>
-                <p className="text-xs text-muted uppercase tracking-wide">{p.kind.replace("_", " ")} · Unverified</p>
-                {p.specialties?.length > 0 && <p className="text-sm">{p.specialties.slice(0, 5).join(" · ")}</p>}
-                <p className="text-sm text-muted">{[p.location, p.telehealth === true ? "Online available" : p.telehealth === false ? "In person only" : null].filter(Boolean).join(" · ") || "Location not stated"}</p>
-                <Field label="Insurance" text={p.insurance_text} /><Field label="Cost" text={p.cost_text} /><Field label="Availability" text={p.availability_text} />
-                {p.quote && <p className="text-sm text-muted italic">Their page says: "{p.quote}"</p>}
-                <p className="text-xs text-muted">Source: <a className="underline text-accent" target="_blank" rel="noreferrer" href={p.source_url}>{host(p.source_url)}</a> · checked {ago(p.checked_at)}</p>
-                {p.url && <a className="inline-flex items-center min-h-12 text-teal underline" target="_blank" rel="noreferrer" href={p.url}>Open their page</a>}
+              <article key={p.id} className="card overflow-hidden grid md:grid-cols-[1fr_auto]">
+                <div className="p-5 lg:p-6 space-y-2 border-t-4 border-sage/50 md:border-t-0 md:border-l-4">
+                  <div className="flex flex-wrap items-center gap-2"><h3 className="text-[1.5rem] leading-tight">{p.name}</h3><span className="tag tag-stone">{p.kind.replace("_", " ")}</span></div>
+                  {p.specialties?.length > 0 && <p className="text-[15px]">{p.specialties.slice(0, 5).join(" · ")}</p>}
+                  <p className="text-[14px] text-ink2">{[p.location, p.telehealth === true ? "Online available" : p.telehealth === false ? "In person only" : null].filter(Boolean).join(" · ") || "Location not stated"}</p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {p.insurance_match ? <span className="tag tag-sage">Their page mentions {insurance || "your plan"}</span> : insurance && !/^(no insurance|self-pay|not sure)$/i.test(insurance) ? <span className="tag tag-stone">Plan not mentioned. Ask them.</span> : null}
+                    <span className="tag tag-terra">Unverified listing</span>
+                  </div>
+                  <Field label="Insurance" text={p.insurance_text} /><Field label="Cost" text={p.cost_text} /><Field label="Availability" text={p.availability_text} />
+                  {p.quote && <p className="text-[14px] text-ink2 italic">Their page says: “{p.quote}”</p>}
+                  <p className="text-[12.5px] text-ink2">Source: <a className="underline text-slate" target="_blank" rel="noreferrer" href={p.source_url}>{host(p.source_url)}</a> · checked {ago(p.checked_at)}</p>
+                </div>
+                <div className="p-5 lg:p-6 flex md:flex-col gap-2 md:justify-center md:w-[220px] bg-cream/60">
+                  {p.url && <a href={p.url} target="_blank" rel="noreferrer" className="b b-primary flex-1 md:flex-none">Open their page</a>}
+                  <button onClick={() => makeScript(p.name)} className="b b-ghost flex-1 md:flex-none">Write my message</button>
+                </div>
               </article>
             ))}
           </div>
 
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold">Support groups</h2>
-            {!res.groups.length && <p className="text-muted bg-surface rounded-2xl p-4">{working ? "Looking for groups…" : "No group matches from public pages yet."}</p>}
+          {res.groups.length > 0 && <h2 className="text-[1.6rem] pt-2">Support groups</h2>}
+          <div className="space-y-4">
             {res.groups.map((g: any) => (
-              <article key={g.id} className="bg-surface rounded-2xl p-4 space-y-1.5">
-                <h3 className="text-lg font-medium">{g.name}</h3>
-                <p className="text-xs text-muted uppercase tracking-wide">{g.kind.replace("_", " ")} · {g.format?.replace("_", " ") ?? "format not stated"} · Unverified</p>
-                {g.topics?.length > 0 && <p className="text-sm">{g.topics.slice(0, 5).join(" · ")}</p>}
-                <Field label="Schedule" text={g.schedule_text} /><Field label="Cost" text={g.cost_text} />
-                {g.quote && <p className="text-sm text-muted italic">Their page says: "{g.quote}"</p>}
-                <p className="text-xs text-muted">Source: <a className="underline text-accent" target="_blank" rel="noreferrer" href={g.source_url}>{host(g.source_url)}</a> · checked {ago(g.checked_at)}</p>
-                {g.url && <a className="inline-flex items-center min-h-12 text-teal underline" target="_blank" rel="noreferrer" href={g.url}>Open their page</a>}
+              <article key={g.id} className="card overflow-hidden grid md:grid-cols-[1fr_auto]">
+                <div className="p-5 lg:p-6 space-y-2 border-t-4 border-slate/40 md:border-t-0 md:border-l-4">
+                  <div className="flex flex-wrap items-center gap-2"><h3 className="text-[1.5rem] leading-tight">{g.name}</h3><span className="tag">{g.kind.replace("_", " ")}</span></div>
+                  <p className="text-[14px] text-ink2">{g.format?.replace("_", " ") ?? "Format not stated"}{g.topics?.length ? ` · ${g.topics.slice(0, 4).join(" · ")}` : ""}</p>
+                  <Field label="Schedule" text={g.schedule_text} /><Field label="Cost" text={g.cost_text} />
+                  {g.quote && <p className="text-[14px] text-ink2 italic">Their page says: “{g.quote}”</p>}
+                  <span className="tag tag-terra">Unverified listing</span>
+                  <p className="text-[12.5px] text-ink2">Source: <a className="underline text-slate" target="_blank" rel="noreferrer" href={g.source_url}>{host(g.source_url)}</a> · checked {ago(g.checked_at)}</p>
+                </div>
+                {g.url && <div className="p-5 lg:p-6 flex md:flex-col gap-2 md:justify-center md:w-[220px] bg-cream/60"><a href={g.url} target="_blank" rel="noreferrer" className="b b-slate flex-1 md:flex-none">Open their page</a></div>}
               </article>
             ))}
           </div>
 
-          <div className="bg-surface rounded-2xl p-4 space-y-2">
-            <h2 className="text-xl font-semibold">Before you reach out</h2>
-            <ul className="space-y-1.5 list-disc pl-5 text-base">{checklist.map((c) => <li key={c}>{c}</li>)}</ul>
-            <div className="flex gap-2 pt-2"><button onClick={copyList} className="flex-1 min-h-12 rounded-xl bg-ground">Copy questions</button><button onClick={save} className="flex-1 min-h-12 rounded-xl bg-ground">Save this list</button></div>
-            {msg && <p role="status" className="text-teal text-sm">{msg}</p>}
-          </div>
+          {(script || !working) && (
+            <article className="card-flat p-6 space-y-3"><p className="eyebrow">Overwhelmed making the call?</p><h3 className="text-[1.5rem]">What to say when reaching out</h3>
+              <p className="text-[14.5px] text-ink2 prose-narrow">You don't have to explain your story in the first message. Paste this into an email or read it as a voicemail.</p>
+              <div className="bg-white rounded-xl border border-line p-4 text-[15px] leading-relaxed">{script || "Writing a message for you…"}</div>
+              <div className="flex gap-2"><button onClick={() => copy(script)} disabled={!script} className="b b-soft border border-line">Copy message</button><button onClick={save} className="b b-soft border border-line">Save this list</button></div>
+              {msg && <p role="status" className="text-sage text-sm">{msg}</p>}</article>
+          )}
 
-          <p className="text-xs text-muted">Read live from public pages when you searched; {res.directory.listings} listings stored, last checked {ago(res.directory.last_checked)}. Insurance, cost and availability are never confirmed here. Somewhere is a demo and not a medical service or crisis line. If you're in crisis, call or text 988.</p>
-          <button onClick={() => setStep(1)} className="w-full min-h-12 rounded-2xl bg-surface">Change my answers</button>
+          <article className="card-flat p-6"><h3 className="text-[1.4rem]">Where this data comes from</h3>
+            <p className="mt-2 text-[14.5px] text-ink2 prose-narrow">When you searched, Bright Data found and read public web pages, Gemini pulled out what each page states, and Neon stored it with the source and time. Nothing is verified, ranked by payment, or sponsored.</p>
+            <ul className="mt-3 flex flex-wrap gap-2">{sources.map(([h, x]: any) => <li key={h} className="tag tag-stone">{h} · {ago(x.checked_at)}</li>)}{!sources.length && <li className="text-[14px] text-ink2">Sources appear as pages are read.</li>}</ul></article>
         </section>
       )}
-    </main>
+    </div>
   );
-}
-
-function Next({ onClick }: { onClick: () => void }) {
-  return <button onClick={onClick} className="w-full min-h-16 rounded-2xl bg-accent text-ground text-lg font-bold mt-2">Next</button>;
 }

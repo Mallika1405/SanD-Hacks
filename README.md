@@ -1,35 +1,33 @@
 # somewhere.
 
-A calm, interruptible voice for panic, intrusive thoughts and overwhelm, then a path to real, sourced care.
+A calm, guided companion for panic, racing thoughts and overwhelm, a voice diary for when you need to talk it out, and a way to find real care. UI built on the "Sanctuary Minimalist" design system (Stitch export).
 
-**Somewhere is a demo and not a medical service or crisis line.** It never diagnoses, never promises to stop an attack, and never replaces qualified care.
+**Somewhere is a demo and not a medical service or crisis line.** It never diagnoses, never promises to stop an attack, and never replaces qualified care. It cannot place calls or send texts; the 988 and 911 buttons open your phone.
 
 ## Run
 ```bash
 npm install
-npm run migrate      # creates the schema (migration 004 drops the old safety-app tables)
-npm run audio        # optional: regenerate the offline fallback audio in public/audio
+npm run migrate      # schema (migration 004 dropped the old safety-app tables)
+npm run audio        # optional: regenerate offline fallback audio
 npm run dev          # use Chrome: speech recognition needs it
 ```
-Uses the env vars already in `.env.local`: `DATABASE_URL`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE`, `BRIGHTDATA_UNLOCKER_ZONE`, `CRON_SECRET`. Optional: `GEMINI_MODEL`. No Twilio, no SMS/voice APIs, no server-initiated calls or texts.
+Uses the existing `.env.local` (`DATABASE_URL`, `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `BRIGHTDATA_API_KEY`, `BRIGHTDATA_SERP_ZONE`, `BRIGHTDATA_UNLOCKER_ZONE`, `CRON_SECRET`). No new variables. No Twilio, no SMS or voice APIs.
 
-Open `/demo` for a scripted simulated anxiety episode.
+## Pages
+- **In the Moment (`/`)**: tap what your body needs (panic, looping thoughts, sensory overwhelm), optionally where you are. A calm voice tells you what to do, step by step, with no questions. Side panels: *why this works right now* (with source and honest evidence strength), room anchors, live trusted sources, a technique chooser.
+- **Between Moments (`/between`)**: consented check-ins, what helps you, history, saved support, **Delete my data**.
+- **Voice Diary (`/diary`)**: you talk, it *listens* (a quiet "mm" on pauses, optional one-line reflections, no advice). It then shows "what I heard", you edit it, and save only if you want. Themes, feelings and intensity over time, stored in Neon. Not a chatbot.
+- **Find Care (`/care`)**: your city (or location), insurance, care type and budget. Bright Data reads public pages live, Gemini extracts, Neon stores. Every listing is labelled unverified, with the page's own wording, source and checked time, plus a copy-paste outreach message.
+- **Crisis Support (`/crisis`)**: 988, Crisis Text Line, Trevor Project, Veterans Crisis Line, international lines, and 3 grounding steps.
 
-## How it works
-- **SOS (`/session`)**: browser mic (speech recognition) -> `POST /api/sos/turn` (state machine: start, support, adapt, finish, follow-up, crisis; Gemini inside it) -> streamed ElevenLabs TTS (`eleven_flash_v2_5`). Speaking over it cuts the audio instantly (barge-in); it resumes from the exact sentence.
-- **Safety first**: every utterance goes through deterministic rules plus a Gemini classifier before anything else. Self-harm shows 988 (call/text) and 911; chest pain, fainting or breathing trouble is never treated as anxiety. The app never places a call: the buttons open the phone's dialer. `npm run test:agent` checks sample risk phrases.
-- **Modes**: "I'm panicking right now" (directive guidance), racing thoughts, overwhelmed, "Just talk to me" (a warm conversation that moves into guidance when she needs it), and "Breathe with me" (`/breathe`, a no-voice pacer). In a session, Options has voice speed, captions only, a technique chooser, and the trusted-sources list.
-- **Voice**: ElevenLabs `eleven_turbo_v2_5` at natural speed; next lines are loaded ahead and a short human line plays between blocks, so there are no gaps.
-- **Directive guidance, no questions**: it tells her what to do, step by step, and moves to the next technique on its own (about 8 blocks, then a closing). She can interrupt, but never has to. The only question it can ask is a safety question when she mentions a possible emergency symptom. Research and limits: `docs/EVIDENCE.md`.
-- **Live research (Bright Data)**: the moment a session starts, Bright Data searches allowlisted health sources (NHS, NIMH, Mayo Clinic, ADAA, Cleveland Clinic, HelpGuide and others), Gemini turns the pages into short spoken steps, and Neon stores them with `source_url` and `checked_at`. It runs in the background so the first seconds are never slowed; the first technique is always a reviewed one. Researched techniques are labelled "not reviewed by a clinician" and are never used for intrusive thoughts.
-- **Exercises** live in `lib/exercises.ts`, all marked `needs human review`. Gemini may rephrase for tone only. Intrusive-thought flow never reassures about the thought's content.
-- **Voices**: 4 calm ElevenLabs presets, plus "a voice you trust" (instant clone, consent timestamped, labelled in-session, can only speak signed reviewed text, deleted at ElevenLabs when you delete).
-- **Fallback audio**: `public/audio` is pre-generated for the welcome, safety messages and three core exercises.
-- **Support (`/care`)**: when she searches, Bright Data finds public pages for her answers, Gemini extracts providers and groups, Neon stores them with `source_url`, `checked_at`, `verified=false`. Results stream in live. Insurance, cost and availability are always labelled unverified.
-- **Check-ins, history, preferences**: only after she says yes. `/me` shows them and has **Delete my data**.
+## How the in-the-moment guidance works
+Browser mic (speech recognition) -> `POST /api/sos/turn` (state machine) -> streamed ElevenLabs TTS. Speaking over it cuts the audio instantly and it resumes from the exact sentence. Directive guidance in a human voice, moving through an evidence-based arc by itself (`docs/EVIDENCE.md`).
+- **Safety first**: every utterance goes through deterministic rules plus a Gemini classifier. Self-harm shows 988 and 911; chest pain, fainting or breathing trouble is never treated as anxiety. The Voice Diary checks silently as you talk.
+- **Live research (Bright Data + Gemini + Neon)**: at session start, Bright Data searches allowlisted health sites (NHS, NIMH, Mayo Clinic, ADAA, Cleveland Clinic, HelpGuide, others), tailored to where you are; Gemini turns pages into spoken steps plus a "why it works" and anchors; Neon stores them with source and time. Common cases are pre-warmed. Never used for intrusive thoughts (reviewed exercises only).
+- **Voices**: ElevenLabs Turbo v2.5, natural pace, next lines preloaded; presets and "a voice you trust" (cloning with consent, deleted at ElevenLabs when you delete). Offline fallback audio in `public/audio`.
 
 ## Privacy
-Anonymous device cookie, no accounts. No raw audio and no stored transcripts: the last few turns live only in the session row while it is active and are purged when it ends. Preferences are stored only after consent.
+Anonymous device cookie, no accounts. No raw audio. No transcripts unless you turn on "keep the full transcript" for a diary entry. Preferences, check-ins and diary entries exist only after you choose them, and **Delete my data** removes everything.
 
 ## Sponsors
-ElevenLabs (live voice, barge-in, TTS, preset and cloned voices, fallback audio) · Gemini (dialogue, safety classification, matching, extraction) · Neon (sessions, consented preferences, check-ins, provider and group directory) · Bright Data (live public provider and group discovery with sources and freshness; affordable-care angle for Data for Good).
+ElevenLabs (voice, barge-in, cloning) · Gemini (conversation, safety classification, extraction, reflection) · Neon (sessions, preferences, check-ins, diary, provider and technique directory) · Bright Data (live public research for techniques and care).

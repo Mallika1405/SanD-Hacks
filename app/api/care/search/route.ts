@@ -10,11 +10,12 @@ const Body = z.object({
   city: z.string().max(80).default("San Diego, CA"),
   goals: z.array(z.string().max(60)).max(8).default([]),
   budget: z.enum(["free", "low", "flexible"]).default("flexible"),
-  insurance: z.string().max(60).default(""),
+  insurance: z.string().max(80).default(""),
   language: z.string().max(40).default("English"),
   gender: z.string().max(30).default("No preference"),
   extras: z.array(z.string().max(60)).max(6).default([]),
   format: z.enum(["online", "in_person", "either"]).default("either"),
+  modality: z.array(z.enum(["therapy", "groups", "psychiatry", "low_cost"])).default(["therapy", "groups"]),
 });
 
 /** Streams newline-delimited JSON: status updates and re-ranked results while pages are read live. */
