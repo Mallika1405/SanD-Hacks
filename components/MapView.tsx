@@ -9,9 +9,10 @@ export type MapHeat = { lat: number; lng: number; w?: number };
 
 const STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  sources: { base: { type: "raster", tileSize: 256, attribution: "© OpenStreetMap © CARTO",
-    tiles: ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"] } },
-  layers: [{ id: "base", type: "raster", source: "base" }],
+  sources: { base: { type: "raster", tileSize: 256, attribution: "© OpenStreetMap contributors",
+    tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"] } },
+  // Darken standard OSM tiles so the map matches the dark UI (no API key needed).
+  layers: [{ id: "base", type: "raster", source: "base", paint: { "raster-brightness-max": 0.38, "raster-brightness-min": 0, "raster-saturation": -0.7, "raster-contrast": 0.25 } }],
 };
 
 export default function MapView({ center, markers = [], lines = [], heat = [], follow = true, className = "h-72" }: {
